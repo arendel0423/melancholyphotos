@@ -1,22 +1,38 @@
-﻿import '../styles/site.css';
+import { useState, useEffect } from 'react';
+import '../styles/site.css';
 
 import RouteStyles from '../components/RouteStyles';
-
+import GalleryViewer from '../components/GalleryViewer';
 
 function Gallery() {
 
     RouteStyles();
 
+    const [albums, setAlbums] = useState(null);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        fetch('/api/gallery')
+            .then(r => {
+                if (!r.ok) throw new Error(`Gallery API error: ${r.status}`);
+                return r.json();
+            })
+            .then(setAlbums)
+            .catch(err => setError(err.message));
+    }, []);
+
     return (
         <div className="mx-auto h-full w-full">
             <div className="place-items-center items-start justify-center 2xl:flex">
-                <div className="border-2 m-3 min-h-[900px] w-[var(--content-max-width)] border-orange-800">
-                    <div className="h-[650px] w-full bg-[url(/src/assets/galleryroom.png)]">
-                        
-                    </div>
-                    <div className="border-t-2 h-[250px] w-full border-orange-800 bg-[url(/src/assets/galleryuibg.png)]">
-                        
-                    </div>
+                <div className="m-3 flex flex-col items-center">
+                    {error && (
+                        <div className="text-red-400 p-4">{error}</div>
+                    )}
+                    {!albums && !error && (
+                        <div className="text-gray-400 p-4">Loading gallery…</div>
+                    )}
+                    {albums && <GalleryViewer albums={albums} />}
+                    <div className="border-t-2 h-[250px] w-[900px] border-orange-800 bg-[url(/src/assets/galleryuibg.png)]" />
                 </div>
             </div>
         </div>
