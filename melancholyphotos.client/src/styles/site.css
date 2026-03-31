@@ -1,0 +1,15 @@
+﻿@import "tailwindcss";
+
+/* Page specific style changes */
+body.homepage {
+    background: url("../assets/brickwall.jpg");
+    cursor: url("../assets/handopencursor.png") 104 0, default;
+}
+
+body.homepage a {
+    cursor: url("../assets/handcursor.png") 64 0, default;
+}
+
+@theme {
+    --content-max-width: 900px;
+}
