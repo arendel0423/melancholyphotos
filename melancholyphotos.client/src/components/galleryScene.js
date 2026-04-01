@@ -16,13 +16,14 @@ const MOVE_SPEED = 5.0;
 
 // Stylized color palette
 const C = {
-    floor:      0xc8c2b8,
-    wall:       0xf2ede5,
-    ceiling:    0xfafaf8,
-    entryWall:  0x7d1a2e,
-    doorFrame:  0xd4a520,
-    photoFrame: 0xd4af37,
-    mat:        0xf0ebe0,
+    floor:         0xc8c2b8,
+    wall:          0xf2ede5,
+    ceiling:       0xfafaf8,
+    lobbyCeiling:  0xe3faf9,
+    entryWall:     0x7d1a2e,
+    doorFrame:     0xd4a520,
+    photoFrame:    0xd4af37,
+    mat:           0xf0ebe0,
 };
 
 // ── Material helpers ──────────────────────────────────────────────────────────
@@ -445,9 +446,9 @@ function createExitSignTexture() {
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
 
-    // Green rounded-rect background
+    // Deep green rounded-rect background
     const R = 18;
-    ctx.fillStyle = '#197319';
+    ctx.fillStyle = '#0a4a0a';
     ctx.beginPath();
     ctx.moveTo(R, 0); ctx.lineTo(W - R, 0);
     ctx.arcTo(W, 0, W, R, R); ctx.lineTo(W, H - R);
@@ -456,35 +457,27 @@ function createExitSignTexture() {
     ctx.arcTo(0, 0, R, 0, R); ctx.closePath();
     ctx.fill();
 
-    // Text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 30px Arial, sans-serif';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText('EMERGENCY', 20, 16);
-    ctx.font = 'bold 90px Arial Black, sans-serif';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText('EXIT', 20, H - 16);
-
-    // Running man (simplified ISO-style stick figure)
-    const mx = W * 0.71, my = H * 0.52, sc = 1.05;
+    // Running man — left third of sign, vertically centred, large
+    const mx = W * 0.22, my = H * 0.52, sc = 1.7;
     ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#ffffff';
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.arc(mx, my - 52 * sc, 16 * sc, 0, Math.PI * 2); ctx.fill();
-    ctx.lineWidth = 10 * sc;
-    ctx.beginPath(); ctx.moveTo(mx, my - 36 * sc); ctx.lineTo(mx - 7 * sc, my + 12 * sc); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(mx, my - 18 * sc); ctx.lineTo(mx - 28 * sc, my - 2 * sc); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(mx - 7 * sc, my + 12 * sc); ctx.lineTo(mx + 16 * sc, my + 46 * sc); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(mx - 7 * sc, my + 12 * sc); ctx.lineTo(mx - 24 * sc, my + 46 * sc); ctx.stroke();
+    // head
+    ctx.beginPath(); ctx.arc(mx, my - 52 * sc, 14 * sc, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 9 * sc;
+    // torso
+    ctx.beginPath(); ctx.moveTo(mx, my - 38 * sc); ctx.lineTo(mx - 5 * sc, my + 10 * sc); ctx.stroke();
+    // arms
+    ctx.beginPath(); ctx.moveTo(mx, my - 22 * sc); ctx.lineTo(mx - 26 * sc, my - 4 * sc); ctx.stroke();
+    // legs
+    ctx.beginPath(); ctx.moveTo(mx - 5 * sc, my + 10 * sc); ctx.lineTo(mx + 14 * sc, my + 42 * sc); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx - 5 * sc, my + 10 * sc); ctx.lineTo(mx - 22 * sc, my + 42 * sc); ctx.stroke();
 
-    // Down-arrow
-    const ax = W * 0.89, ay = H * 0.50, aw = 22, al = 38;
+    // EXIT text — right two-thirds, vertically centred
     ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(ax - aw / 2, ay - al / 2); ctx.lineTo(ax + aw / 2, ay - al / 2);
-    ctx.lineTo(ax + aw / 2, ay); ctx.lineTo(ax + aw, ay);
-    ctx.lineTo(ax, ay + al / 2);
-    ctx.lineTo(ax - aw, ay); ctx.lineTo(ax - aw / 2, ay);
-    ctx.closePath(); ctx.fill();
+    ctx.font = 'bold 118px Arial Black, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('EXIT', W * 0.64, H * 0.52);
 
     return canvas;
 }
@@ -557,6 +550,114 @@ function addExitDoor(scene, exitDoors, wallX, centerZ, facingRight) {
     exitDoors.push({ x: wallX, z: centerZ });
 }
 
+// ── Animated waterfall fixture ────────────────────────────────────────────────
+
+function addWaterfall(scene, cx, cz) {
+    const FW = 2.4, FH = 2.8, FT = 0.22, FD = 0.18;
+    const steelMat = new THREE.MeshLambertMaterial({ color: 0x7b3c1a });
+
+    // Four frame bars: top, bottom, left, right
+    const mkBar = (w, h, d, x, y, z) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), steelMat);
+        m.position.set(x, y, z);
+        scene.add(m);
+    };
+    mkBar(FW,       FT, FD,  cx,                    FH - FT / 2,  cz); // top
+    mkBar(FW,       FT, FD,  cx,                    FT / 2,       cz); // bottom
+    mkBar(FT, FH - FT, FD,  cx - FW / 2 + FT / 2,  FT + (FH - FT) / 2, cz); // left
+    mkBar(FT, FH - FT, FD,  cx + FW / 2 - FT / 2,  FT + (FH - FT) / 2, cz); // right
+
+    // Animated water curtain
+    const WC_W = 256, WC_H = 512;
+    const waterCanvas = document.createElement('canvas');
+    waterCanvas.width = WC_W; waterCanvas.height = WC_H;
+    const waterTex = new THREE.CanvasTexture(waterCanvas);
+
+    const innerW = FW - FT * 2;
+    const innerH = FH - FT * 2;
+    const waterMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(innerW, innerH),
+        new THREE.MeshLambertMaterial({ map: waterTex, transparent: true, side: THREE.DoubleSide, depthWrite: false })
+    );
+    waterMesh.position.set(cx, FT + innerH / 2, cz);
+    scene.add(waterMesh);
+
+    // Pool (dark stone surround)
+    const poolW = FW + 0.5, poolD = 1.0, poolH = 0.15;
+    const poolMat = new THREE.MeshLambertMaterial({ color: 0x2a2520 });
+    const pool = new THREE.Mesh(new THREE.BoxGeometry(poolW, poolH, poolD), poolMat);
+    pool.position.set(cx, poolH / 2, cz);
+    scene.add(pool);
+
+    // Animated pool water surface
+    const PW_W = 128, PW_H = 128;
+    const poolCanvas = document.createElement('canvas');
+    poolCanvas.width = PW_W; poolCanvas.height = PW_H;
+    const poolTex = new THREE.CanvasTexture(poolCanvas);
+    const poolWater = new THREE.Mesh(
+        new THREE.PlaneGeometry(poolW - 0.08, poolD - 0.08),
+        new THREE.MeshLambertMaterial({ map: poolTex, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+    );
+    poolWater.rotation.x = -Math.PI / 2;
+    poolWater.position.set(cx, poolH + 0.002, cz);
+    scene.add(poolWater);
+
+    // Soft blue-white light from the water face
+    const waterLight = new THREE.PointLight(0x88bbdd, 1.0, 5.0);
+    waterLight.position.set(cx, FH * 0.5, cz + 0.6);
+    scene.add(waterLight);
+
+    return {
+        update(t) {
+            // --- Water curtain ---
+            const ctx = waterCanvas.getContext('2d');
+            ctx.clearRect(0, 0, WC_W, WC_H);
+            ctx.fillStyle = 'rgba(25, 55, 95, 0.55)';
+            ctx.fillRect(0, 0, WC_W, WC_H);
+
+            const numStreaks = 24;
+            for (let i = 0; i < numStreaks; i++) {
+                const baseX = (i + 0.5) * (WC_W / numStreaks);
+                const x     = baseX + Math.sin(i * 2.3 + t * 0.35) * 3;
+                const speed = 1.1 + (i % 5) * 0.18;
+                const sLen  = WC_H * (0.32 + Math.sin(i * 1.1 + t * 0.25) * 0.08);
+                const yTop  = ((t * speed * 65 + i * (WC_H / numStreaks) * 2.2) % (WC_H + sLen)) - sLen;
+
+                const g = ctx.createLinearGradient(x, yTop, x, yTop + sLen);
+                g.addColorStop(0,    'rgba(200, 230, 255, 0)');
+                g.addColorStop(0.15, 'rgba(215, 240, 255, 0.88)');
+                g.addColorStop(0.85, 'rgba(195, 225, 252, 0.65)');
+                g.addColorStop(1,    'rgba(175, 210, 248, 0)');
+
+                ctx.strokeStyle = g;
+                ctx.lineWidth = (WC_W / numStreaks) * 0.52;
+                ctx.lineCap = 'butt';
+                ctx.beginPath();
+                ctx.moveTo(x, yTop);
+                ctx.lineTo(x + Math.sin(t * 0.55 + i * 0.45) * 2.5, yTop + sLen);
+                ctx.stroke();
+            }
+            waterTex.needsUpdate = true;
+
+            // --- Pool ripples ---
+            const pctx = poolCanvas.getContext('2d');
+            pctx.clearRect(0, 0, PW_W, PW_H);
+            pctx.fillStyle = 'rgba(22, 55, 95, 0.9)';
+            pctx.fillRect(0, 0, PW_W, PW_H);
+            for (let r = 0; r < 5; r++) {
+                const radius = ((t * 35 + r * 18) % 55);
+                const alpha  = (1 - radius / 55) * 0.55;
+                pctx.strokeStyle = `rgba(180, 220, 255, ${alpha})`;
+                pctx.lineWidth = 1.5;
+                pctx.beginPath();
+                pctx.arc(PW_W / 2, PW_H / 2, radius + 3, 0, Math.PI * 2);
+                pctx.stroke();
+            }
+            poolTex.needsUpdate = true;
+        },
+    };
+}
+
 // ── Lobby ─────────────────────────────────────────────────────────────────────
 
 function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ, exitDoors) {
@@ -576,7 +677,7 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ, ex
     // Ceiling
     const ceil = new THREE.Mesh(
         new THREE.PlaneGeometry(lobbyWidth, totalFloorDepth),
-        mat(C.ceiling)
+        mat(C.lobbyCeiling)
     );
     ceil.rotation.x = Math.PI / 2;
     ceil.position.set(0, ROOM_HEIGHT, floorCenterZ);
@@ -644,6 +745,9 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ, ex
     addExitDoor(scene, exitDoors, -lobbyWidth / 2, floorCenterZ, true);
     addExitDoor(scene, exitDoors,  lobbyWidth / 2, floorCenterZ, false);
 
+    // Waterfall fixture — centred in the lobby
+    const waterfallUpdater = addWaterfall(scene, 0, floorCenterZ);
+
     // Crown moulding — round tube matching arch trim style (radius 0.04) on all four lobby walls
     const mldMat = new THREE.MeshLambertMaterial({ color: C.doorFrame });
     const MLD_R = 0.04;
@@ -670,6 +774,8 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ, ex
     rightMld.rotation.x = Math.PI / 2;
     rightMld.position.set(lobbyWidth / 2, mldY, floorCenterZ);
     scene.add(rightMld);
+
+    return waterfallUpdater;
 }
 
 // ── Floor tile accent lines (decorative) ─────────────────────────────────────
@@ -710,14 +816,14 @@ export function buildScene(scene, albums) {
     scene.add(ambient);
 
     const exitDoors = [];
-    buildLobby(scene, n, lobbyWidth, roomXPositions, roomStartZ, exitDoors);
+    const waterfallUpdater = buildLobby(scene, n, lobbyWidth, roomXPositions, roomStartZ, exitDoors);
     buildFloorGrid(scene, lobbyWidth);
 
     albums.forEach((album, i) => {
         buildAlbumRoom(scene, loader, clickables, album, roomXPositions[i], roomStartZ);
     });
 
-    return { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors };
+    return { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors, updateWaterfall: waterfallUpdater.update };
 }
 
 // ── Collision zones ───────────────────────────────────────────────────────────

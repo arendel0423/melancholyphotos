@@ -54,10 +54,11 @@ export default function GalleryViewer({ albums }) {
     const [fading, setFading] = useState(false);
 
     // Refs for values needed inside the animation loop / event handlers
-    const clickablesRef = useRef([]);
-    const controlsRef   = useRef(null);
-    const exitDoorsRef  = useRef([]);
-    const fadingRef     = useRef(false);
+    const clickablesRef       = useRef([]);
+    const controlsRef         = useRef(null);
+    const exitDoorsRef        = useRef([]);
+    const fadingRef           = useRef(false);
+    const updateWaterfallRef  = useRef(null);
 
     const handlePhotoClick = useCallback((url) => {
         setSelectedPhoto(url);
@@ -99,10 +100,11 @@ export default function GalleryViewer({ albums }) {
         const camera = new THREE.PerspectiveCamera(75, CANVAS_W / CANVAS_H, 0.1, 60);
 
         // ── Build scene geometry ──────────────────────────────────────────────
-        const { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors } =
+        const { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors, updateWaterfall } =
             buildScene(scene, albums);
-        clickablesRef.current = clickables;
-        exitDoorsRef.current  = exitDoors;
+        clickablesRef.current        = clickables;
+        exitDoorsRef.current         = exitDoors;
+        updateWaterfallRef.current   = updateWaterfall;
         const zones = buildZones(lobbyWidth, roomXPositions, roomStartZ);
 
         // Spawn in front of the rightmost doorway, facing the doorway wall
@@ -195,6 +197,9 @@ export default function GalleryViewer({ albums }) {
                     }
                 }
             }
+
+            // Animate waterfall
+            if (updateWaterfallRef.current) updateWaterfallRef.current(clock.getElapsedTime());
 
             renderer.render(scene, camera);
         };
