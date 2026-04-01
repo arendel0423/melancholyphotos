@@ -419,8 +419,8 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         }
     }
 
-    // Greek marble columns — one centered between each adjacent doorway, flush with back wall
-    const colZ = roomStartZ + 0.28;
+    // Greek marble columns — one centered between each adjacent doorway, pulled 0.5 units from back wall
+    const colZ = roomStartZ + 0.78;
     for (let i = 0; i + 1 < sortedX.length; i++) {
         addGreekColumn(scene, (sortedX[i] + sortedX[i + 1]) / 2, colZ);
     }
@@ -432,27 +432,32 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         addCanLight(scene, cx, rowZ, 0xfffae8, 5.0, 16);
     }
 
-    // Gold baseboard and crown moulding on all four lobby walls
-    const trimMat = new THREE.MeshLambertMaterial({ color: C.doorFrame, side: THREE.DoubleSide });
-    const H_BB = 0.14, H_CR = 0.10;
-    // [planeWidth, posX, posZ, rotY]
-    const trimWalls = [
-        [lobbyWidth,    0,              ENTRANCE_DEPTH, 0],
-        [lobbyWidth,    0,              roomStartZ,     Math.PI],
-        [totalDepth,   -lobbyWidth / 2, floorCenterZ,   Math.PI / 2],
-        [totalDepth,    lobbyWidth / 2, floorCenterZ,  -Math.PI / 2],
-    ];
-    for (const [w, px, pz, ry] of trimWalls) {
-        const bb = new THREE.Mesh(new THREE.PlaneGeometry(w, H_BB), trimMat);
-        bb.rotation.y = ry;
-        bb.position.set(px, H_BB / 2, pz);
-        scene.add(bb);
+    // Crown moulding — round tube matching arch trim style (radius 0.04) on all four lobby walls
+    const mldMat = new THREE.MeshLambertMaterial({ color: C.doorFrame });
+    const MLD_R = 0.04;
+    const mldY  = ROOM_HEIGHT - MLD_R;
 
-        const cr = new THREE.Mesh(new THREE.PlaneGeometry(w, H_CR), trimMat);
-        cr.rotation.y = ry;
-        cr.position.set(px, ROOM_HEIGHT - H_CR / 2, pz);
-        scene.add(cr);
-    }
+    // Entry & back walls: tube runs along X
+    const entryMld = new THREE.Mesh(new THREE.CylinderGeometry(MLD_R, MLD_R, lobbyWidth, 8), mldMat);
+    entryMld.rotation.z = Math.PI / 2;
+    entryMld.position.set(0, mldY, ENTRANCE_DEPTH);
+    scene.add(entryMld);
+
+    const backMld = new THREE.Mesh(new THREE.CylinderGeometry(MLD_R, MLD_R, lobbyWidth, 8), mldMat);
+    backMld.rotation.z = Math.PI / 2;
+    backMld.position.set(0, mldY, roomStartZ);
+    scene.add(backMld);
+
+    // Left & right walls: tube runs along Z
+    const leftMld = new THREE.Mesh(new THREE.CylinderGeometry(MLD_R, MLD_R, totalFloorDepth, 8), mldMat);
+    leftMld.rotation.x = Math.PI / 2;
+    leftMld.position.set(-lobbyWidth / 2, mldY, floorCenterZ);
+    scene.add(leftMld);
+
+    const rightMld = new THREE.Mesh(new THREE.CylinderGeometry(MLD_R, MLD_R, totalFloorDepth, 8), mldMat);
+    rightMld.rotation.x = Math.PI / 2;
+    rightMld.position.set(lobbyWidth / 2, mldY, floorCenterZ);
+    scene.add(rightMld);
 }
 
 // ── Floor tile accent lines (decorative) ─────────────────────────────────────
