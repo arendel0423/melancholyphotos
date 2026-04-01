@@ -180,7 +180,7 @@ function addArchedWall(scene, wallW, wallH, archCentersX_local, cx, cz) {
         shape.holes.push(hole);
     }
 
-    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 16), mat(C.wall));
+    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 16), mat(C.entryWall));
     mesh.position.set(cx, 0, cz);
     scene.add(mesh);
 
