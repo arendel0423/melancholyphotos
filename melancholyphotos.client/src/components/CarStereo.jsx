@@ -256,7 +256,22 @@ export default function CarStereo() {
 
         const onTime     = () => { S.elapsed  = audio.currentTime; };
         const onDuration = () => { S.duration = audio.duration; };
-        const onEnded    = () => { S.playing = false; S.elapsed = 0; };
+        const onEnded    = () => {
+            const tracks = tracksRef.current;
+            let next = (S.preset + 1) % PRESET_COUNT;
+            if (!tracks[next]?.src) {
+                next = tracks.findIndex(t => t.src);
+            }
+            if (next === -1) { S.playing = false; S.elapsed = 0; return; }
+            S.preset   = next;
+            S.scrollOff = 0;
+            S.elapsed  = 0;
+            S.duration = 0;
+            audioCtxRef.current?.resume();
+            audio.src = tracks[next].src;
+            audio.play().catch(() => { S.playing = false; });
+            S.playing = true;
+        };
 
         audio.addEventListener('timeupdate',      onTime);
         audio.addEventListener('durationchange',  onDuration);
@@ -389,11 +404,11 @@ export default function CarStereo() {
             ctx.save();
             ctx.translate(BRAND_X + BRAND_W / 2, BRAND_Y + BRAND_H / 2);
             ctx.rotate(-Math.PI / 2);
-            ctx.font = 'bold 24px monospace';
+            ctx.font = 'bold 16px monospace';
             ctx.fillStyle = '#7c3a10';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('MELANCHOLY', 0, 0);
+            ctx.fillText('MELANCHOLY RADIO', 0, 0);
             ctx.restore();
 
             // Power LED
