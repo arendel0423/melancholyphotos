@@ -78,9 +78,9 @@ function createMarbleTexture() {
     ctx.fillRect(0, 0, W, H);
 
     const veinDefs = [
-        { color: 'rgba(195,188,178,0.40)', lw: 2 },
-        { color: 'rgba(160,153,143,0.30)', lw: 1 },
-        { color: 'rgba(212,207,200,0.22)', lw: 1 },
+        { color: 'rgba(120,108,92,0.75)', lw: 2 },
+        { color: 'rgba(85,74,60,0.55)',   lw: 1 },
+        { color: 'rgba(155,142,128,0.50)', lw: 1 },
     ];
     for (let v = 0; v < 14; v++) {
         const def = veinDefs[v % veinDefs.length];
@@ -187,13 +187,24 @@ function addArchedWall(scene, wallW, wallH, archCentersX_local, cx, cz) {
     scene.add(mesh);
 
     for (const ox of archCentersX_local) {
-        // Gold arch trim ring (torus semicircle, lies in the XY / wall plane)
-        const trim = new THREE.Mesh(
+        const trimMat = mat(C.doorFrame);
+        // Semicircular arch trim ring (lies in XY / wall plane)
+        const archTrim = new THREE.Mesh(
             new THREE.TorusGeometry(ARCH_RADIUS, 0.04, 8, 28, Math.PI),
-            mat(C.doorFrame)
+            trimMat
         );
-        trim.position.set(cx + ox, ARCH_BASE_Y, cz);
-        scene.add(trim);
+        archTrim.position.set(cx + ox, ARCH_BASE_Y, cz);
+        scene.add(archTrim);
+
+        // Vertical jamb trim — runs from floor up to where the arch springs
+        const jambGeo = new THREE.BoxGeometry(0.08, ARCH_BASE_Y, 0.08);
+        const jambY   = ARCH_BASE_Y / 2;
+        const leftJamb  = new THREE.Mesh(jambGeo, trimMat);
+        const rightJamb = new THREE.Mesh(jambGeo, trimMat);
+        leftJamb.position.set(cx + ox - ARCH_RADIUS, jambY, cz);
+        rightJamb.position.set(cx + ox + ARCH_RADIUS, jambY, cz);
+        scene.add(leftJamb);
+        scene.add(rightJamb);
     }
 }
 
@@ -416,14 +427,13 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         addGreekColumn(scene, (sortedX[i] + sortedX[i + 1]) / 2, colZ);
     }
 
-    // Can light in front of each doorway
+    // Can lights — 2 rows aligned with doorway centers, equally spaced front-to-back
+    const rowZ1 = -LOBBY_DEPTH / 3;
+    const rowZ2 = -2 * LOBBY_DEPTH / 3;
     for (const cx of roomXPositions) {
-        addCanLight(scene, cx, roomStartZ + 1.2, 0xfffae8, 5.0, 10);
+        addCanLight(scene, cx, rowZ1, 0xfffae8, 4.5, 14);
+        addCanLight(scene, cx, rowZ2, 0xfffae8, 4.5, 14);
     }
-
-    // Inset can lights in lobby ceiling
-    addCanLight(scene, 0, -LOBBY_DEPTH * 0.25, 0xfffae8, 4.0, 18);
-    addCanLight(scene, 0, -LOBBY_DEPTH * 0.75, 0xfffae8, 4.0, 18);
 }
 
 // ── Floor tile accent lines (decorative) ─────────────────────────────────────
