@@ -51,10 +51,13 @@ export default function GalleryViewer({ albums }) {
     const mountRef = useRef(null);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
     const [isLocked, setIsLocked] = useState(false);
+    const [fading, setFading] = useState(false);
 
     // Refs for values needed inside the animation loop / event handlers
     const clickablesRef = useRef([]);
     const controlsRef   = useRef(null);
+    const exitDoorsRef  = useRef([]);
+    const fadingRef     = useRef(false);
 
     const handlePhotoClick = useCallback((url) => {
         setSelectedPhoto(url);
@@ -96,9 +99,10 @@ export default function GalleryViewer({ albums }) {
         const camera = new THREE.PerspectiveCamera(75, CANVAS_W / CANVAS_H, 0.1, 60);
 
         // ── Build scene geometry ──────────────────────────────────────────────
-        const { clickables, lobbyWidth, roomXPositions, roomStartZ } =
+        const { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors } =
             buildScene(scene, albums);
         clickablesRef.current = clickables;
+        exitDoorsRef.current  = exitDoors;
         const zones = buildZones(lobbyWidth, roomXPositions, roomStartZ);
 
         // Spawn in front of the rightmost doorway, facing the doorway wall
@@ -155,6 +159,13 @@ export default function GalleryViewer({ albums }) {
         const clock = new THREE.Clock();
         let animId;
 
+        const triggerExit = () => {
+            if (fadingRef.current) return;
+            fadingRef.current = true;
+            controls.unlock();
+            setFading(true);
+        };
+
         const animate = () => {
             animId = requestAnimationFrame(animate);
             const delta = Math.min(clock.getDelta(), 0.05); // cap delta to avoid tunneling
@@ -174,6 +185,15 @@ export default function GalleryViewer({ albums }) {
 
                 // Lock Y to player eye height
                 camera.position.y = PLAYER_HEIGHT;
+
+                // Exit door proximity → fade to black
+                for (const door of exitDoorsRef.current) {
+                    if (Math.abs(camera.position.x - door.x) < 1.5 &&
+                        Math.abs(camera.position.z - door.z) < 1.5) {
+                        triggerExit();
+                        break;
+                    }
+                }
             }
 
             renderer.render(scene, camera);
@@ -232,6 +252,17 @@ export default function GalleryViewer({ albums }) {
             {selectedPhoto && (
                 <PhotoOverlay url={selectedPhoto} onClose={closePhoto} />
             )}
+
+            {/* Fade-to-black overlay (exit door transition) */}
+            <div
+                style={{
+                    position: 'absolute', inset: 0, background: 'black', zIndex: 40,
+                    opacity: fading ? 1 : 0,
+                    transition: fading ? 'opacity 1.2s ease' : 'none',
+                    pointerEvents: 'none',
+                }}
+                onTransitionEnd={() => { if (fading) window.location.href = '/'; }}
+            />
         </div>
     );
 }

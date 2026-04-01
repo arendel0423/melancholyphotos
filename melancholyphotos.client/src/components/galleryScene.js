@@ -391,9 +391,175 @@ function addBench(scene, x, z) {
     }
 }
 
+// ── Potted cycad plant ────────────────────────────────────────────────────────
+
+function addCycad(scene, x, z) {
+    const potMat   = new THREE.MeshLambertMaterial({ color: 0x7a4a28 });
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x3d2c18 });
+    const frondMat = new THREE.MeshLambertMaterial({ color: 0x286018, side: THREE.DoubleSide });
+
+    // Decorative tapered pot
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.16, 0.30, 12), potMat);
+    pot.position.set(x, 0.15, z);
+    scene.add(pot);
+
+    // Soil disk
+    const soil = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 12),
+        new THREE.MeshLambertMaterial({ color: 0x1a0d02 }));
+    soil.position.set(x, 0.315, z);
+    scene.add(soil);
+
+    // Short stocky trunk
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.10, 0.40, 8), trunkMat);
+    trunk.position.set(x, 0.52, z);
+    scene.add(trunk);
+
+    // Crown fronds — quaternion-aligned so each local +Y points along the frond axis
+    const FRONDS = 14, FROND_L = 0.95, FROND_W = 0.055;
+    const DROOP = Math.PI * 0.33; // ~59 ° from vertical
+    const CROWN_Y = 0.72;
+    const up = new THREE.Vector3(0, 1, 0);
+    for (let f = 0; f < FRONDS; f++) {
+        const az = (f / FRONDS) * Math.PI * 2;
+        const dir = new THREE.Vector3(
+            Math.sin(az) * Math.sin(DROOP),
+            Math.cos(DROOP),
+            Math.cos(az) * Math.sin(DROOP)
+        ).normalize();
+        const frond = new THREE.Mesh(new THREE.PlaneGeometry(FROND_W, FROND_L), frondMat);
+        frond.position.set(
+            x + dir.x * FROND_L * 0.5,
+            CROWN_Y + dir.y * FROND_L * 0.5,
+            z + dir.z * FROND_L * 0.5
+        );
+        frond.quaternion.setFromUnitVectors(up, dir);
+        scene.add(frond);
+    }
+}
+
+// ── Exit sign canvas texture ──────────────────────────────────────────────────
+
+function createExitSignTexture() {
+    const W = 512, H = 240;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    // Green rounded-rect background
+    const R = 18;
+    ctx.fillStyle = '#197319';
+    ctx.beginPath();
+    ctx.moveTo(R, 0); ctx.lineTo(W - R, 0);
+    ctx.arcTo(W, 0, W, R, R); ctx.lineTo(W, H - R);
+    ctx.arcTo(W, H, W - R, H, R); ctx.lineTo(R, H);
+    ctx.arcTo(0, H, 0, H - R, R); ctx.lineTo(0, R);
+    ctx.arcTo(0, 0, R, 0, R); ctx.closePath();
+    ctx.fill();
+
+    // Text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 30px Arial, sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText('EMERGENCY', 20, 16);
+    ctx.font = 'bold 90px Arial Black, sans-serif';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('EXIT', 20, H - 16);
+
+    // Running man (simplified ISO-style stick figure)
+    const mx = W * 0.71, my = H * 0.52, sc = 1.05;
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#ffffff';
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.arc(mx, my - 52 * sc, 16 * sc, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 10 * sc;
+    ctx.beginPath(); ctx.moveTo(mx, my - 36 * sc); ctx.lineTo(mx - 7 * sc, my + 12 * sc); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx, my - 18 * sc); ctx.lineTo(mx - 28 * sc, my - 2 * sc); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx - 7 * sc, my + 12 * sc); ctx.lineTo(mx + 16 * sc, my + 46 * sc); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx - 7 * sc, my + 12 * sc); ctx.lineTo(mx - 24 * sc, my + 46 * sc); ctx.stroke();
+
+    // Down-arrow
+    const ax = W * 0.89, ay = H * 0.50, aw = 22, al = 38;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(ax - aw / 2, ay - al / 2); ctx.lineTo(ax + aw / 2, ay - al / 2);
+    ctx.lineTo(ax + aw / 2, ay); ctx.lineTo(ax + aw, ay);
+    ctx.lineTo(ax, ay + al / 2);
+    ctx.lineTo(ax - aw, ay); ctx.lineTo(ax - aw / 2, ay);
+    ctx.closePath(); ctx.fill();
+
+    return canvas;
+}
+
+// ── Exit door with gold frame, push bar, and glowing sign ────────────────────
+
+function addExitDoor(scene, exitDoors, wallX, centerZ, facingRight) {
+    const goldMat = new THREE.MeshLambertMaterial({ color: C.doorFrame });
+    const doorMat = new THREE.MeshLambertMaterial({ color: 0x1a0d06, side: THREE.DoubleSide });
+
+    const DOOR_W = 1.2, DOOR_H = 2.4, FR = 0.04;
+    const xDir = facingRight ? 1 : -1; // into lobby
+    const ry   = facingRight ? Math.PI / 2 : -Math.PI / 2;
+
+    // Door panel
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(DOOR_W, DOOR_H), doorMat);
+    panel.rotation.y = ry;
+    panel.position.set(wallX + xDir * 0.01, DOOR_H / 2, centerZ);
+    scene.add(panel);
+
+    // Gold frame: horizontal top/bottom tubes (run along Z)
+    for (const cy of [DOOR_H + FR, -FR]) {
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(FR, FR, DOOR_W + FR * 2, 8), goldMat);
+        bar.rotation.x = Math.PI / 2;
+        bar.position.set(wallX + xDir * 0.02, cy, centerZ);
+        scene.add(bar);
+    }
+    // Gold frame: vertical jamb tubes (run along Y)
+    for (const dz of [-DOOR_W / 2, DOOR_W / 2]) {
+        const jamb = new THREE.Mesh(new THREE.CylinderGeometry(FR, FR, DOOR_H + FR * 2, 8), goldMat);
+        jamb.position.set(wallX + xDir * 0.02, DOOR_H / 2, centerZ + dz);
+        scene.add(jamb);
+    }
+
+    // Push bar: horizontal rod with bracket mounts
+    const barLen = DOOR_W * 0.65;
+    const pushBar = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, barLen, 8), goldMat);
+    pushBar.rotation.x = Math.PI / 2;
+    pushBar.position.set(wallX + xDir * 0.10, 1.0, centerZ);
+    scene.add(pushBar);
+    for (const dz of [-barLen * 0.35, barLen * 0.35]) {
+        const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.10, 6), goldMat);
+        mount.rotation.z = Math.PI / 2;
+        mount.position.set(wallX + xDir * 0.055, 1.0, centerZ + dz);
+        scene.add(mount);
+    }
+
+    // Glowing EXIT sign above door
+    const signW = 1.0, signH = signW * (240 / 512);
+    const signTex = new THREE.CanvasTexture(createExitSignTexture());
+    const signMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(signW, signH),
+        new THREE.MeshLambertMaterial({
+            map: signTex,
+            emissive: new THREE.Color(0xffffff),
+            emissiveMap: signTex,
+            emissiveIntensity: 0.9,
+            side: THREE.DoubleSide,
+        })
+    );
+    signMesh.rotation.y = ry;
+    signMesh.position.set(wallX + xDir * 0.03, DOOR_H + signH / 2 + 0.10, centerZ);
+    scene.add(signMesh);
+
+    // Soft green point light for sign glow
+    const glow = new THREE.PointLight(0x00cc44, 1.0, 5.0);
+    glow.position.set(wallX + xDir * 0.3, DOOR_H + signH / 2 + 0.10, centerZ);
+    scene.add(glow);
+
+    exitDoors.push({ x: wallX, z: centerZ });
+}
+
 // ── Lobby ─────────────────────────────────────────────────────────────────────
 
-function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
+function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ, exitDoors) {
     const lz = 0;
     const totalFloorDepth = LOBBY_DEPTH + ENTRANCE_DEPTH;
     const floorCenterZ = lz - LOBBY_DEPTH / 2 + ENTRANCE_DEPTH / 2;
@@ -469,6 +635,15 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         addBench(scene, cx, benchZ);
     }
 
+    // Cycad plants — centered between each adjacent bench
+    for (let i = 0; i + 1 < sortedX.length; i++) {
+        addCycad(scene, (sortedX[i] + sortedX[i + 1]) / 2, benchZ);
+    }
+
+    // Exit doors on left and right walls
+    addExitDoor(scene, exitDoors, -lobbyWidth / 2, floorCenterZ, true);
+    addExitDoor(scene, exitDoors,  lobbyWidth / 2, floorCenterZ, false);
+
     // Crown moulding — round tube matching arch trim style (radius 0.04) on all four lobby walls
     const mldMat = new THREE.MeshLambertMaterial({ color: C.doorFrame });
     const MLD_R = 0.04;
@@ -534,14 +709,15 @@ export function buildScene(scene, albums) {
     const ambient = new THREE.AmbientLight(0xfff8f0, 1.0);
     scene.add(ambient);
 
-    buildLobby(scene, n, lobbyWidth, roomXPositions, roomStartZ);
+    const exitDoors = [];
+    buildLobby(scene, n, lobbyWidth, roomXPositions, roomStartZ, exitDoors);
     buildFloorGrid(scene, lobbyWidth);
 
     albums.forEach((album, i) => {
         buildAlbumRoom(scene, loader, clickables, album, roomXPositions[i], roomStartZ);
     });
 
-    return { clickables, lobbyWidth, roomXPositions, roomStartZ };
+    return { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors };
 }
 
 // ── Collision zones ───────────────────────────────────────────────────────────
