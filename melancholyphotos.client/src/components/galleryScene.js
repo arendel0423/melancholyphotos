@@ -65,27 +65,101 @@ function addPlane(scene, w, h, color, px, py, pz, ry = 0) {
     return mesh;
 }
 
-// ── Column pillar (base + shaft + capital) ────────────────────────────────────
+// ── Marble texture (procedural) ───────────────────────────────────────────────
 
-function addPillar(scene, x, z) {
-    const R = 0.15;
-    const H = ARCH_BASE_Y;
-    const pillarMat = mat(0xedeae0);
+function createMarbleTexture() {
+    const W = 256, H = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
 
-    // Base
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.45, R * 1.45, 0.12, 16), pillarMat);
-    base.position.set(x, 0.06, z);
-    scene.add(base);
+    ctx.fillStyle = '#f0ede8';
+    ctx.fillRect(0, 0, W, H);
 
-    // Shaft
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 1.08, H - 0.24, 16), pillarMat);
-    shaft.position.set(x, H / 2, z);
+    const veinDefs = [
+        { color: 'rgba(195,188,178,0.40)', lw: 2 },
+        { color: 'rgba(160,153,143,0.30)', lw: 1 },
+        { color: 'rgba(212,207,200,0.22)', lw: 1 },
+    ];
+    for (let v = 0; v < 14; v++) {
+        const def = veinDefs[v % veinDefs.length];
+        ctx.beginPath();
+        ctx.strokeStyle = def.color;
+        ctx.lineWidth = def.lw;
+        let vx = (v / 14) * W + 8;
+        ctx.moveTo(vx, 0);
+        for (let y = 0; y <= H; y += 4) {
+            vx += Math.sin(y * 0.025 + v * 1.3) * 2.8;
+            ctx.lineTo(vx, y);
+        }
+        ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+}
+
+let _marbleTexture = null;
+
+// ── Greek marble column (fluted Doric order, floor-to-ceiling) ────────────────
+
+function addGreekColumn(scene, x, z) {
+    if (!_marbleTexture) _marbleTexture = createMarbleTexture();
+
+    const marbleMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: _marbleTexture, side: THREE.DoubleSide });
+    const solidMat  = new THREE.MeshLambertMaterial({ color: 0xedeae4 });
+
+    const SHAFT_Y0 = 0.12;
+    const SHAFT_Y1 = ROOM_HEIGHT - 0.20;
+    const SHAFT_H  = SHAFT_Y1 - SHAFT_Y0;
+    const R_BOT = 0.195, R_TOP = 0.165;
+
+    // Square plinth base
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.06, 0.52), solidMat);
+    plinth.position.set(x, 0.03, z);
+    scene.add(plinth);
+
+    // Base torus molding (horizontal ring)
+    const baseTorus = new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.026, 8, 24), marbleMat);
+    baseTorus.rotation.x = Math.PI / 2;
+    baseTorus.position.set(x, SHAFT_Y0 - 0.01, z);
+    scene.add(baseTorus);
+
+    // Main shaft (slight entasis taper)
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(R_TOP, R_BOT, SHAFT_H, 24), marbleMat);
+    shaft.position.set(x, SHAFT_Y0 + SHAFT_H / 2, z);
     scene.add(shaft);
 
-    // Capital
-    const capital = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.45, R, 0.12, 16), pillarMat);
-    capital.position.set(x, H - 0.06, z);
-    scene.add(capital);
+    // 20 flute arrises (thin raised ridges around shaft surface)
+    const FLUTES = 20;
+    const RIDGE_R = 0.021;
+    const avgShaftR = (R_BOT + R_TOP) / 2 + RIDGE_R * 0.55;
+    for (let f = 0; f < FLUTES; f++) {
+        const angle = (f / FLUTES) * Math.PI * 2;
+        const ridge = new THREE.Mesh(
+            new THREE.CylinderGeometry(RIDGE_R, RIDGE_R * (R_BOT / R_TOP), SHAFT_H, 6),
+            marbleMat
+        );
+        ridge.position.set(
+            x + Math.cos(angle) * avgShaftR,
+            SHAFT_Y0 + SHAFT_H / 2,
+            z + Math.sin(angle) * avgShaftR
+        );
+        scene.add(ridge);
+    }
+
+    // Echinus capital (frustum flaring outward)
+    const echinus = new THREE.Mesh(new THREE.CylinderGeometry(0.275, R_TOP, 0.16, 24), marbleMat);
+    echinus.position.set(x, SHAFT_Y1 + 0.08, z);
+    scene.add(echinus);
+
+    // Square abacus slab
+    const abacus = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.07, 0.60), solidMat);
+    abacus.position.set(x, SHAFT_Y1 + 0.195, z);
+    scene.add(abacus);
 }
 
 // ── Arched wall panel (ShapeGeometry with arch holes + trim + pillars) ────────
@@ -120,10 +194,6 @@ function addArchedWall(scene, wallW, wallH, archCentersX_local, cx, cz) {
         );
         trim.position.set(cx + ox, ARCH_BASE_Y, cz);
         scene.add(trim);
-
-        // Pillars flanking the arch
-        addPillar(scene, cx + ox - ARCH_RADIUS, cz);
-        addPillar(scene, cx + ox + ARCH_RADIUS, cz);
     }
 }
 
@@ -338,6 +408,17 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         if (w > 0.01) {
             addPlane(scene, w, ROOM_HEIGHT, C.wall, (x1 + x2) / 2, ROOM_HEIGHT / 2, backZ, 0);
         }
+    }
+
+    // Greek marble columns — one centered between each adjacent doorway, flush with back wall
+    const colZ = roomStartZ + 0.28;
+    for (let i = 0; i + 1 < sortedX.length; i++) {
+        addGreekColumn(scene, (sortedX[i] + sortedX[i + 1]) / 2, colZ);
+    }
+
+    // Can light in front of each doorway
+    for (const cx of roomXPositions) {
+        addCanLight(scene, cx, roomStartZ + 1.2, 0xfffae8, 5.0, 10);
     }
 
     // Inset can lights in lobby ceiling
