@@ -94,13 +94,15 @@ export default function GalleryViewer({ albums }) {
         scene.fog = new THREE.Fog(0xf0ede5, 20, 45);
 
         const camera = new THREE.PerspectiveCamera(75, CANVAS_W / CANVAS_H, 0.1, 60);
-        camera.position.set(0, PLAYER_HEIGHT, 3); // start in entrance area
 
         // ── Build scene geometry ──────────────────────────────────────────────
         const { clickables, lobbyWidth, roomXPositions, roomStartZ } =
             buildScene(scene, albums);
         clickablesRef.current = clickables;
         const zones = buildZones(lobbyWidth, roomXPositions, roomStartZ);
+
+        // Spawn in front of the rightmost doorway, facing the doorway wall
+        camera.position.set(roomXPositions[roomXPositions.length - 1], PLAYER_HEIGHT, 2);
 
         // ── Pointer lock controls ─────────────────────────────────────────────
         const controls = new PointerLockControls(camera, renderer.domElement);

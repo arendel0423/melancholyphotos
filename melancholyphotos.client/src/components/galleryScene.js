@@ -360,6 +360,37 @@ function buildAlbumRoom(scene, loader, clickables, album, cx, roomStartZ) {
     }
 }
 
+// ── Lobby bench (dark wood seat, gold frame legs + stretchers) ───────────────
+
+function addBench(scene, x, z) {
+    const woodMat = new THREE.MeshLambertMaterial({ color: 0x2d1a08 });
+    const goldMat = new THREE.MeshLambertMaterial({ color: C.doorFrame });
+
+    const W = 1.7, D = 0.40, LEG_H = 0.44, SEAT_H = 0.08, LEG_R = 0.035;
+
+    // Seat slab
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(W, SEAT_H, D), woodMat);
+    seat.position.set(x, LEG_H + SEAT_H / 2, z);
+    scene.add(seat);
+
+    // 4 slender cylindrical legs at seat corners
+    const legXOff = W / 2 - 0.12;
+    const legZOff = D / 2 - 0.07;
+    for (const [ox, oz] of [[legXOff, legZOff], [-legXOff, legZOff], [legXOff, -legZOff], [-legXOff, -legZOff]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R, LEG_H, 8), goldMat);
+        leg.position.set(x + ox, LEG_H / 2, z + oz);
+        scene.add(leg);
+    }
+
+    // Cross stretchers connecting front & back leg pairs at low height
+    for (const oz of [legZOff, -legZOff]) {
+        const str = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R * 0.6, LEG_R * 0.6, W - 0.24, 6), goldMat);
+        str.rotation.z = Math.PI / 2;
+        str.position.set(x, 0.14, z + oz);
+        scene.add(str);
+    }
+}
+
 // ── Lobby ─────────────────────────────────────────────────────────────────────
 
 function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
@@ -430,6 +461,12 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
     const rowZ = ENTRANCE_DEPTH - totalDepth / 2;
     for (const cx of roomXPositions) {
         addCanLight(scene, cx, rowZ, 0xfffae8, 5.0, 16);
+    }
+
+    // Benches — centered on each doorway X, same distance from entry wall as pillars are from back wall
+    const benchZ = ENTRANCE_DEPTH - 0.78;
+    for (const cx of roomXPositions) {
+        addBench(scene, cx, benchZ);
     }
 
     // Crown moulding — round tube matching arch trim style (radius 0.04) on all four lobby walls
