@@ -9,6 +9,8 @@ const LOBBY_DEPTH = 7.0;       // Z: lobby runs from 0 to -LOBBY_DEPTH
 const ENTRANCE_DEPTH = 4.0;    // Z: entrance area in front of lobby (player start zone)
 const DOORWAY_WIDTH = 2.5;
 const DOORWAY_HEIGHT = 2.8;
+const ARCH_RADIUS = DOORWAY_WIDTH / 2;          // 1.25 — radius of the semicircular arch
+const ARCH_BASE_Y = DOORWAY_HEIGHT - ARCH_RADIUS; // 1.55 — y where arch spring meets straight sides
 const PLAYER_HEIGHT = 1.7;
 const MOVE_SPEED = 5.0;
 
@@ -61,6 +63,68 @@ function addPlane(scene, w, h, color, px, py, pz, ry = 0) {
     mesh.position.set(px, py, pz);
     scene.add(mesh);
     return mesh;
+}
+
+// ── Column pillar (base + shaft + capital) ────────────────────────────────────
+
+function addPillar(scene, x, z) {
+    const R = 0.15;
+    const H = ARCH_BASE_Y;
+    const pillarMat = mat(0xedeae0);
+
+    // Base
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.45, R * 1.45, 0.12, 16), pillarMat);
+    base.position.set(x, 0.06, z);
+    scene.add(base);
+
+    // Shaft
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 1.08, H - 0.24, 16), pillarMat);
+    shaft.position.set(x, H / 2, z);
+    scene.add(shaft);
+
+    // Capital
+    const capital = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.45, R, 0.12, 16), pillarMat);
+    capital.position.set(x, H - 0.06, z);
+    scene.add(capital);
+}
+
+// ── Arched wall panel (ShapeGeometry with arch holes + trim + pillars) ────────
+
+function addArchedWall(scene, wallW, wallH, archCentersX_local, cx, cz) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-wallW / 2, 0);
+    shape.lineTo( wallW / 2, 0);
+    shape.lineTo( wallW / 2, wallH);
+    shape.lineTo(-wallW / 2, wallH);
+    shape.closePath();
+
+    for (const ox of archCentersX_local) {
+        const hole = new THREE.Path();
+        hole.moveTo(ox - ARCH_RADIUS, 0);
+        hole.lineTo(ox - ARCH_RADIUS, ARCH_BASE_Y);
+        hole.absarc(ox, ARCH_BASE_Y, ARCH_RADIUS, Math.PI, 0, true);
+        hole.lineTo(ox + ARCH_RADIUS, 0);
+        hole.closePath();
+        shape.holes.push(hole);
+    }
+
+    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 16), mat(C.wall));
+    mesh.position.set(cx, 0, cz);
+    scene.add(mesh);
+
+    for (const ox of archCentersX_local) {
+        // Gold arch trim ring (torus semicircle, lies in the XY / wall plane)
+        const trim = new THREE.Mesh(
+            new THREE.TorusGeometry(ARCH_RADIUS, 0.04, 8, 28, Math.PI),
+            mat(C.doorFrame)
+        );
+        trim.position.set(cx + ox, ARCH_BASE_Y, cz);
+        scene.add(trim);
+
+        // Pillars flanking the arch
+        addPillar(scene, cx + ox - ARCH_RADIUS, cz);
+        addPillar(scene, cx + ox + ARCH_RADIUS, cz);
+    }
 }
 
 // ── Inset can light fixture ───────────────────────────────────────────────────
@@ -139,7 +203,6 @@ function addPhotoFrame(scene, loader, clickables, photoUrl, px, py, pz, ry) {
 function buildAlbumRoom(scene, loader, clickables, album, cx, roomStartZ) {
     const rz = roomStartZ; // front edge of room
     const mid = { x: cx, z: rz - ROOM_DEPTH / 2 };
-    const leftStripW = (ROOM_WIDTH - DOORWAY_WIDTH) / 2;
 
     // Floor
     const roomFloor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_WIDTH, ROOM_DEPTH), mat(C.floor));
@@ -162,30 +225,8 @@ function buildAlbumRoom(scene, loader, clickables, album, cx, roomStartZ) {
     // Right wall (faces -X into room)
     addPlane(scene, ROOM_DEPTH, ROOM_HEIGHT, C.wall, cx + ROOM_WIDTH / 2, ROOM_HEIGHT / 2, mid.z, -Math.PI / 2);
 
-    // Front wall segments (faces -Z toward lobby), with doorway gap
-    const topH = ROOM_HEIGHT - DOORWAY_HEIGHT;
-    // Top strip
-    addPlane(scene, ROOM_WIDTH, topH, C.wall, cx, DOORWAY_HEIGHT + topH / 2, rz, Math.PI);
-    // Left strip
-    addPlane(scene, leftStripW, DOORWAY_HEIGHT, C.wall, cx - DOORWAY_WIDTH / 2 - leftStripW / 2, DOORWAY_HEIGHT / 2, rz, Math.PI);
-    // Right strip
-    addPlane(scene, leftStripW, DOORWAY_HEIGHT, C.wall, cx + DOORWAY_WIDTH / 2 + leftStripW / 2, DOORWAY_HEIGHT / 2, rz, Math.PI);
-
-    // Door frame trim (gold accents)
-    const trimMat = mat(C.doorFrame);
-    const trimDepth = 0.08;
-    // Left jamb
-    const ljamb = new THREE.Mesh(new THREE.BoxGeometry(trimDepth, DOORWAY_HEIGHT, trimDepth), trimMat);
-    ljamb.position.set(cx - DOORWAY_WIDTH / 2, DOORWAY_HEIGHT / 2, rz);
-    scene.add(ljamb);
-    // Right jamb
-    const rjamb = ljamb.clone();
-    rjamb.position.set(cx + DOORWAY_WIDTH / 2, DOORWAY_HEIGHT / 2, rz);
-    scene.add(rjamb);
-    // Lintel
-    const lintel = new THREE.Mesh(new THREE.BoxGeometry(DOORWAY_WIDTH + trimDepth * 2, trimDepth, trimDepth), trimMat);
-    lintel.position.set(cx, DOORWAY_HEIGHT, rz);
-    scene.add(lintel);
+    // Front wall: arched opening with pillars and gold trim ring
+    addArchedWall(scene, ROOM_WIDTH, ROOM_HEIGHT, [0], cx, rz);
 
     // Album name label on back wall
     const labelTex = createLabelTexture(album.name);
@@ -286,24 +327,16 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
     // Front entrance wall (faces -Z, behind player start)
     addPlane(scene, lobbyWidth, ROOM_HEIGHT, C.wall, 0, ROOM_HEIGHT / 2, ENTRANCE_DEPTH, 0);
 
-    // Back wall with doorway openings
+    // Back wall: fill panels in areas between / outside room arch walls (full height)
     const backZ = roomStartZ;
-    const topH = ROOM_HEIGHT - DOORWAY_HEIGHT;
-
-    // Full top strip
-    addPlane(scene, lobbyWidth, topH, C.wall, 0, DOORWAY_HEIGHT + topH / 2, backZ, Math.PI);
-
-    // Build vertical segments around each doorway
     const sortedX = [...roomXPositions].sort((a, b) => a - b);
     const half = lobbyWidth / 2;
-
-    // Edges: leftmost cap, gaps between rooms, rightmost cap
-    const edges = [-half, ...sortedX.flatMap(x => [x - DOORWAY_WIDTH / 2, x + DOORWAY_WIDTH / 2]), half];
+    const edges = [-half, ...sortedX.flatMap(x => [x - ROOM_WIDTH / 2, x + ROOM_WIDTH / 2]), half];
     for (let i = 0; i < edges.length; i += 2) {
         const x1 = edges[i], x2 = edges[i + 1];
         const w = x2 - x1;
         if (w > 0.01) {
-            addPlane(scene, w, DOORWAY_HEIGHT, C.wall, (x1 + x2) / 2, DOORWAY_HEIGHT / 2, backZ, Math.PI);
+            addPlane(scene, w, ROOM_HEIGHT, C.wall, (x1 + x2) / 2, ROOM_HEIGHT / 2, backZ, 0);
         }
     }
 
