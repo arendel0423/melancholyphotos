@@ -20,7 +20,7 @@ const C = {
     wall:       0xf2ede5,
     ceiling:    0xfafaf8,
     entryWall:  0x7d1a2e,
-    doorFrame:  0x8b6914,
+    doorFrame:  0xd4a520,
     photoFrame: 0xd4af37,
     mat:        0xf0ebe0,
 };
@@ -113,15 +113,15 @@ function addGreekColumn(scene, x, z) {
     const SHAFT_Y0 = 0.12;
     const SHAFT_Y1 = ROOM_HEIGHT - 0.20;
     const SHAFT_H  = SHAFT_Y1 - SHAFT_Y0;
-    const R_BOT = 0.195, R_TOP = 0.165;
+    const R_BOT = 0.39, R_TOP = 0.33;
 
     // Square plinth base
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.06, 0.52), colMat);
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.06, 1.04), colMat);
     plinth.position.set(x, 0.03, z);
     scene.add(plinth);
 
     // Base torus molding (horizontal ring)
-    const baseTorus = new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.026, 8, 24), colMat);
+    const baseTorus = new THREE.Mesh(new THREE.TorusGeometry(0.39, 0.052, 8, 24), colMat);
     baseTorus.rotation.x = Math.PI / 2;
     baseTorus.position.set(x, SHAFT_Y0 - 0.01, z);
     scene.add(baseTorus);
@@ -131,10 +131,10 @@ function addGreekColumn(scene, x, z) {
     shaft.position.set(x, SHAFT_Y0 + SHAFT_H / 2, z);
     scene.add(shaft);
 
-    // 20 flute arrises (thin raised ridges around shaft surface)
+    // 20 deep flute arrises — pushed well beyond shaft surface for pronounced grooves
     const FLUTES = 20;
-    const RIDGE_R = 0.021;
-    const avgShaftR = (R_BOT + R_TOP) / 2 + RIDGE_R * 0.55;
+    const RIDGE_R = 0.055;
+    const avgShaftR = (R_BOT + R_TOP) / 2 + RIDGE_R;
     for (let f = 0; f < FLUTES; f++) {
         const angle = (f / FLUTES) * Math.PI * 2;
         const ridge = new THREE.Mesh(
@@ -150,13 +150,13 @@ function addGreekColumn(scene, x, z) {
     }
 
     // Echinus capital (frustum flaring outward)
-    const echinus = new THREE.Mesh(new THREE.CylinderGeometry(0.275, R_TOP, 0.16, 24), colMat);
-    echinus.position.set(x, SHAFT_Y1 + 0.08, z);
+    const echinus = new THREE.Mesh(new THREE.CylinderGeometry(0.55, R_TOP, 0.28, 24), colMat);
+    echinus.position.set(x, SHAFT_Y1 + 0.14, z);
     scene.add(echinus);
 
     // Square abacus slab
-    const abacus = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.07, 0.60), colMat);
-    abacus.position.set(x, SHAFT_Y1 + 0.195, z);
+    const abacus = new THREE.Mesh(new THREE.BoxGeometry(1.20, 0.12, 1.20), colMat);
+    abacus.position.set(x, SHAFT_Y1 + 0.34, z);
     scene.add(abacus);
 }
 
@@ -430,6 +430,28 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
     const rowZ = ENTRANCE_DEPTH - totalDepth / 2;
     for (const cx of roomXPositions) {
         addCanLight(scene, cx, rowZ, 0xfffae8, 5.0, 16);
+    }
+
+    // Gold baseboard and crown moulding on all four lobby walls
+    const trimMat = new THREE.MeshLambertMaterial({ color: C.doorFrame, side: THREE.DoubleSide });
+    const H_BB = 0.14, H_CR = 0.10;
+    // [planeWidth, posX, posZ, rotY]
+    const trimWalls = [
+        [lobbyWidth,    0,              ENTRANCE_DEPTH, 0],
+        [lobbyWidth,    0,              roomStartZ,     Math.PI],
+        [totalDepth,   -lobbyWidth / 2, floorCenterZ,   Math.PI / 2],
+        [totalDepth,    lobbyWidth / 2, floorCenterZ,  -Math.PI / 2],
+    ];
+    for (const [w, px, pz, ry] of trimWalls) {
+        const bb = new THREE.Mesh(new THREE.PlaneGeometry(w, H_BB), trimMat);
+        bb.rotation.y = ry;
+        bb.position.set(px, H_BB / 2, pz);
+        scene.add(bb);
+
+        const cr = new THREE.Mesh(new THREE.PlaneGeometry(w, H_CR), trimMat);
+        cr.rotation.y = ry;
+        cr.position.set(px, ROOM_HEIGHT - H_CR / 2, pz);
+        scene.add(cr);
     }
 }
 
