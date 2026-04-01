@@ -3,6 +3,7 @@ import '../styles/site.css';
 
 import RouteStyles from '../components/RouteStyles';
 import GalleryViewer from '../components/GalleryViewer';
+import CarStereo from '../components/CarStereo';
 
 function Gallery() {
 
@@ -32,7 +33,9 @@ function Gallery() {
                         <div className="text-gray-400 p-4">Loading gallery…</div>
                     )}
                     {albums && <GalleryViewer albums={albums} />}
-                    <div className="border-t-2 h-[250px] w-[900px] border-orange-800 bg-[url(/src/assets/galleryuibg.png)]" />
+                    <div className="border-t-2 w-[900px] border-orange-800 bg-[#3d1a08]">
+                        <CarStereo />
+                    </div>
                 </div>
             </div>
         </div>
