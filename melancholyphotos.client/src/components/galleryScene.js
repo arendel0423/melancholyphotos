@@ -107,10 +107,7 @@ let _marbleTexture = null;
 // ── Greek marble column (fluted Doric order, floor-to-ceiling) ────────────────
 
 function addGreekColumn(scene, x, z) {
-    if (!_marbleTexture) _marbleTexture = createMarbleTexture();
-
-    const marbleMat = new THREE.MeshLambertMaterial({ color: 0xffffff, map: _marbleTexture, side: THREE.DoubleSide });
-    const solidMat  = new THREE.MeshLambertMaterial({ color: 0xedeae4 });
+    const colMat = new THREE.MeshLambertMaterial({ color: 0xedeae4, side: THREE.DoubleSide });
 
     const SHAFT_Y0 = 0.12;
     const SHAFT_Y1 = ROOM_HEIGHT - 0.20;
@@ -118,18 +115,18 @@ function addGreekColumn(scene, x, z) {
     const R_BOT = 0.195, R_TOP = 0.165;
 
     // Square plinth base
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.06, 0.52), solidMat);
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.06, 0.52), colMat);
     plinth.position.set(x, 0.03, z);
     scene.add(plinth);
 
     // Base torus molding (horizontal ring)
-    const baseTorus = new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.026, 8, 24), marbleMat);
+    const baseTorus = new THREE.Mesh(new THREE.TorusGeometry(0.195, 0.026, 8, 24), colMat);
     baseTorus.rotation.x = Math.PI / 2;
     baseTorus.position.set(x, SHAFT_Y0 - 0.01, z);
     scene.add(baseTorus);
 
     // Main shaft (slight entasis taper)
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(R_TOP, R_BOT, SHAFT_H, 24), marbleMat);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(R_TOP, R_BOT, SHAFT_H, 24), colMat);
     shaft.position.set(x, SHAFT_Y0 + SHAFT_H / 2, z);
     scene.add(shaft);
 
@@ -141,7 +138,7 @@ function addGreekColumn(scene, x, z) {
         const angle = (f / FLUTES) * Math.PI * 2;
         const ridge = new THREE.Mesh(
             new THREE.CylinderGeometry(RIDGE_R, RIDGE_R * (R_BOT / R_TOP), SHAFT_H, 6),
-            marbleMat
+            colMat
         );
         ridge.position.set(
             x + Math.cos(angle) * avgShaftR,
@@ -152,12 +149,12 @@ function addGreekColumn(scene, x, z) {
     }
 
     // Echinus capital (frustum flaring outward)
-    const echinus = new THREE.Mesh(new THREE.CylinderGeometry(0.275, R_TOP, 0.16, 24), marbleMat);
+    const echinus = new THREE.Mesh(new THREE.CylinderGeometry(0.275, R_TOP, 0.16, 24), colMat);
     echinus.position.set(x, SHAFT_Y1 + 0.08, z);
     scene.add(echinus);
 
     // Square abacus slab
-    const abacus = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.07, 0.60), solidMat);
+    const abacus = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.07, 0.60), colMat);
     abacus.position.set(x, SHAFT_Y1 + 0.195, z);
     scene.add(abacus);
 }
@@ -196,8 +193,8 @@ function addArchedWall(scene, wallW, wallH, archCentersX_local, cx, cz) {
         archTrim.position.set(cx + ox, ARCH_BASE_Y, cz);
         scene.add(archTrim);
 
-        // Vertical jamb trim — runs from floor up to where the arch springs
-        const jambGeo = new THREE.BoxGeometry(0.08, ARCH_BASE_Y, 0.08);
+        // Vertical jamb trim — cylindrical tube from floor to arch spring, matching torus profile
+        const jambGeo = new THREE.CylinderGeometry(0.04, 0.04, ARCH_BASE_Y, 8);
         const jambY   = ARCH_BASE_Y / 2;
         const leftJamb  = new THREE.Mesh(jambGeo, trimMat);
         const rightJamb = new THREE.Mesh(jambGeo, trimMat);
@@ -427,9 +424,10 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         addGreekColumn(scene, (sortedX[i] + sortedX[i + 1]) / 2, colZ);
     }
 
-    // Can lights — 2 rows aligned with doorway centers, equally spaced front-to-back
-    const rowZ1 = -LOBBY_DEPTH / 3;
-    const rowZ2 = -2 * LOBBY_DEPTH / 3;
+    // Can lights — 2 rows equidistant between entrance wall and back wall, aligned with doorway centers
+    const totalDepth = ENTRANCE_DEPTH + LOBBY_DEPTH;
+    const rowZ1 = ENTRANCE_DEPTH - totalDepth / 3;
+    const rowZ2 = ENTRANCE_DEPTH - 2 * totalDepth / 3;
     for (const cx of roomXPositions) {
         addCanLight(scene, cx, rowZ1, 0xfffae8, 4.5, 14);
         addCanLight(scene, cx, rowZ2, 0xfffae8, 4.5, 14);
@@ -488,11 +486,10 @@ export function buildScene(scene, albums) {
 export function buildZones(lobbyWidth, roomXPositions, roomStartZ) {
     const PAD = 0.3;
     return [
-        // Lobby + entrance
-        // Lobby + entrance
+        // Lobby + entrance (PAD at back keeps player from clipping through arch wall)
         {
             minX: -lobbyWidth / 2 + PAD, maxX: lobbyWidth / 2 - PAD,
-            minZ: roomStartZ,            maxZ: ENTRANCE_DEPTH - PAD,
+            minZ: roomStartZ + PAD,      maxZ: ENTRANCE_DEPTH - PAD,
         },
         // Doorway connectors — narrow X, bridge the lobby/room z boundary
         ...roomXPositions.map(cx => ({
