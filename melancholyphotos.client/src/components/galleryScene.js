@@ -19,6 +19,7 @@ const C = {
     floor:      0xc8c2b8,
     wall:       0xf2ede5,
     ceiling:    0xfafaf8,
+    entryWall:  0x7d1a2e,
     doorFrame:  0x8b6914,
     photoFrame: 0xd4af37,
     mat:        0xf0ebe0,
@@ -403,7 +404,7 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
     scene.add(rightWall);
 
     // Front entrance wall (faces -Z, behind player start)
-    addPlane(scene, lobbyWidth, ROOM_HEIGHT, C.wall, 0, ROOM_HEIGHT / 2, ENTRANCE_DEPTH, 0);
+    addPlane(scene, lobbyWidth, ROOM_HEIGHT, C.entryWall, 0, ROOM_HEIGHT / 2, ENTRANCE_DEPTH, 0);
 
     // Back wall: fill panels in areas between / outside room arch walls (full height)
     const backZ = roomStartZ;
@@ -424,13 +425,11 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         addGreekColumn(scene, (sortedX[i] + sortedX[i + 1]) / 2, colZ);
     }
 
-    // Can lights — 2 rows equidistant between entrance wall and back wall, aligned with doorway centers
+    // Can lights — 1 row equidistant between entry wall and back wall, aligned with doorway centers
     const totalDepth = ENTRANCE_DEPTH + LOBBY_DEPTH;
-    const rowZ1 = ENTRANCE_DEPTH - totalDepth / 3;
-    const rowZ2 = ENTRANCE_DEPTH - 2 * totalDepth / 3;
+    const rowZ = ENTRANCE_DEPTH - totalDepth / 2;
     for (const cx of roomXPositions) {
-        addCanLight(scene, cx, rowZ1, 0xfffae8, 4.5, 14);
-        addCanLight(scene, cx, rowZ2, 0xfffae8, 4.5, 14);
+        addCanLight(scene, cx, rowZ, 0xfffae8, 5.0, 16);
     }
 }
 
@@ -491,10 +490,10 @@ export function buildZones(lobbyWidth, roomXPositions, roomStartZ) {
             minX: -lobbyWidth / 2 + PAD, maxX: lobbyWidth / 2 - PAD,
             minZ: roomStartZ + PAD,      maxZ: ENTRANCE_DEPTH - PAD,
         },
-        // Doorway connectors — narrow X, bridge the lobby/room z boundary
+        // Doorway connectors — span roomStartZ ± PAD to bridge the lobby back-wall buffer
         ...roomXPositions.map(cx => ({
             minX: cx - DOORWAY_WIDTH / 2 + PAD, maxX: cx + DOORWAY_WIDTH / 2 - PAD,
-            minZ: roomStartZ - PAD,              maxZ: roomStartZ,
+            minZ: roomStartZ - PAD,              maxZ: roomStartZ + PAD,
         })),
         // Each album room interior
         ...roomXPositions.map(cx => ({
