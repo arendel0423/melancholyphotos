@@ -719,8 +719,11 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ, ex
 
     // Greek marble columns — one centered between each adjacent doorway, pulled 0.5 units from back wall
     const colZ = roomStartZ + 0.78;
+    const colXPositions = [];
     for (let i = 0; i + 1 < sortedX.length; i++) {
-        addGreekColumn(scene, (sortedX[i] + sortedX[i + 1]) / 2, colZ);
+        const cx = (sortedX[i] + sortedX[i + 1]) / 2;
+        colXPositions.push(cx);
+        addGreekColumn(scene, cx, colZ);
     }
 
     // Can lights — 1 row equidistant between entry wall and back wall, aligned with doorway centers
@@ -736,17 +739,56 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ, ex
         addBench(scene, cx, benchZ);
     }
 
-    // Cycad plants — centered between each adjacent bench
+    // Cycad plants — centered between each adjacent bench (same Z as benches)
+    const cycadXPositions = [];
     for (let i = 0; i + 1 < sortedX.length; i++) {
-        addCycad(scene, (sortedX[i] + sortedX[i + 1]) / 2, benchZ);
+        const cx = (sortedX[i] + sortedX[i + 1]) / 2;
+        cycadXPositions.push(cx);
+        addCycad(scene, cx, benchZ);
     }
 
     // Exit doors on left and right walls
     addExitDoor(scene, exitDoors, -lobbyWidth / 2, floorCenterZ, true);
     addExitDoor(scene, exitDoors,  lobbyWidth / 2, floorCenterZ, false);
 
-    // Waterfall fixture — centred in the lobby
-    const waterfallUpdater = addWaterfall(scene, 0, floorCenterZ);
+    // Waterfall fixtures — every other pillar, starting at the 2nd from the right.
+    // colXPositions is sorted left→right; facing the pillar wall (facing -Z), right = higher X.
+    // "2nd from right, every other" → keep indices where (n-1-i) % 2 === 1.
+    const wfXPositions = colXPositions.filter(
+        (_, i) => (colXPositions.length - 1 - i) % 2 === 1
+    );
+    const wfUpdaters = [];
+    for (const cx of wfXPositions) {
+        wfUpdaters.push(addWaterfall(scene, cx, floorCenterZ));
+    }
+    const waterfallUpdater = {
+        update(t) { for (const u of wfUpdaters) u.update(t); },
+    };
+
+    // ── Obstacle zones (blocked rectangles, with ~0.35 player-radius buffer) ────
+    const PBUF = 0.35;
+    const obstacles = [
+        // Columns: abacus is 1.20×1.20
+        ...colXPositions.map(cx => ({
+            minX: cx - (0.60 + PBUF), maxX: cx + (0.60 + PBUF),
+            minZ: colZ - (0.60 + PBUF), maxZ: colZ + (0.60 + PBUF),
+        })),
+        // Waterfalls: frame FW=2.4, pool depth 1.0
+        ...wfXPositions.map(cx => ({
+            minX: cx - (1.20 + PBUF), maxX: cx + (1.20 + PBUF),
+            minZ: floorCenterZ - (0.50 + PBUF), maxZ: floorCenterZ + (0.50 + PBUF),
+        })),
+        // Benches: W=1.7, D=0.40
+        ...roomXPositions.map(cx => ({
+            minX: cx - (0.85 + PBUF), maxX: cx + (0.85 + PBUF),
+            minZ: benchZ - (0.20 + PBUF), maxZ: benchZ + (0.20 + PBUF),
+        })),
+        // Cycads: pot radius 0.25 + frond spread buffer
+        ...cycadXPositions.map(cx => ({
+            minX: cx - (0.25 + PBUF), maxX: cx + (0.25 + PBUF),
+            minZ: benchZ - (0.25 + PBUF), maxZ: benchZ + (0.25 + PBUF),
+        })),
+    ];
 
     // Crown moulding — round tube matching arch trim style (radius 0.04) on all four lobby walls
     const mldMat = new THREE.MeshLambertMaterial({ color: C.doorFrame });
@@ -775,7 +817,7 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ, ex
     rightMld.position.set(lobbyWidth / 2, mldY, floorCenterZ);
     scene.add(rightMld);
 
-    return waterfallUpdater;
+    return { waterfallUpdater, obstacles };
 }
 
 // ── Floor tile accent lines (decorative) ─────────────────────────────────────
@@ -816,14 +858,14 @@ export function buildScene(scene, albums) {
     scene.add(ambient);
 
     const exitDoors = [];
-    const waterfallUpdater = buildLobby(scene, n, lobbyWidth, roomXPositions, roomStartZ, exitDoors);
+    const { waterfallUpdater, obstacles } = buildLobby(scene, n, lobbyWidth, roomXPositions, roomStartZ, exitDoors);
     buildFloorGrid(scene, lobbyWidth);
 
     albums.forEach((album, i) => {
         buildAlbumRoom(scene, loader, clickables, album, roomXPositions[i], roomStartZ);
     });
 
-    return { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors, updateWaterfall: waterfallUpdater.update };
+    return { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors, updateWaterfall: waterfallUpdater.update, obstacles };
 }
 
 // ── Collision zones ───────────────────────────────────────────────────────────
@@ -851,6 +893,10 @@ export function buildZones(lobbyWidth, roomXPositions, roomStartZ) {
 
 export function isInAnyZone(x, z, zones) {
     return zones.some(zone => x >= zone.minX && x <= zone.maxX && z >= zone.minZ && z <= zone.maxZ);
+}
+
+export function isInObstacle(x, z, obstacles) {
+    return obstacles.some(o => x >= o.minX && x <= o.maxX && z >= o.minZ && z <= o.maxZ);
 }
 
 export { PLAYER_HEIGHT, MOVE_SPEED };

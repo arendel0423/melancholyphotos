@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { buildScene, buildZones, isInAnyZone, PLAYER_HEIGHT, MOVE_SPEED } from './galleryScene.js';
+import { buildScene, buildZones, isInAnyZone, isInObstacle, PLAYER_HEIGHT, MOVE_SPEED } from './galleryScene.js';
 
 const CANVAS_W = 900;
 const CANVAS_H = 650;
@@ -59,6 +59,7 @@ export default function GalleryViewer({ albums }) {
     const exitDoorsRef        = useRef([]);
     const fadingRef           = useRef(false);
     const updateWaterfallRef  = useRef(null);
+    const obstaclesRef        = useRef([]);
 
     const handlePhotoClick = useCallback((url) => {
         setSelectedPhoto(url);
@@ -100,11 +101,12 @@ export default function GalleryViewer({ albums }) {
         const camera = new THREE.PerspectiveCamera(75, CANVAS_W / CANVAS_H, 0.1, 60);
 
         // ── Build scene geometry ──────────────────────────────────────────────
-        const { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors, updateWaterfall } =
+        const { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors, updateWaterfall, obstacles } =
             buildScene(scene, albums);
         clickablesRef.current        = clickables;
         exitDoorsRef.current         = exitDoors;
         updateWaterfallRef.current   = updateWaterfall;
+        obstaclesRef.current         = obstacles;
         const zones = buildZones(lobbyWidth, roomXPositions, roomStartZ);
 
         // Spawn in front of the rightmost doorway, facing the doorway wall
@@ -180,8 +182,9 @@ export default function GalleryViewer({ albums }) {
                 if (keys.a) controls.moveRight(  -MOVE_SPEED * delta);
                 if (keys.d) controls.moveRight(   MOVE_SPEED * delta);
 
-                // Collision: revert if outside all valid zones
-                if (!isInAnyZone(camera.position.x, camera.position.z, zones)) {
+                // Collision: revert if outside all valid zones OR inside a solid obstacle
+                if (!isInAnyZone(camera.position.x, camera.position.z, zones) ||
+                    isInObstacle(camera.position.x, camera.position.z, obstaclesRef.current)) {
                     camera.position.copy(prev);
                 }
 
