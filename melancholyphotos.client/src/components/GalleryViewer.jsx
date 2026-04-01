@@ -61,13 +61,19 @@ export default function GalleryViewer({ albums }) {
         controlsRef.current?.unlock();
     }, []);
 
+    const closePhoto = useCallback(() => {
+        setSelectedPhoto(null);
+        // Short delay lets the overlay unmount before the browser accepts a lock request
+        setTimeout(() => controlsRef.current?.lock(), 120);
+    }, []);
+
     // Escape key closes the full-size photo overlay
     useEffect(() => {
         if (!selectedPhoto) return;
-        const onKeyDown = (e) => { if (e.key === 'Escape') setSelectedPhoto(null); };
+        const onKeyDown = (e) => { if (e.key === 'Escape') closePhoto(); };
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
-    }, [selectedPhoto]);
+    }, [selectedPhoto, closePhoto]);
 
     useEffect(() => {
         if (!albums || albums.length === 0) return;
@@ -222,7 +228,7 @@ export default function GalleryViewer({ albums }) {
 
             {/* Full-size photo overlay */}
             {selectedPhoto && (
-                <PhotoOverlay url={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+                <PhotoOverlay url={selectedPhoto} onClose={closePhoto} />
             )}
         </div>
     );

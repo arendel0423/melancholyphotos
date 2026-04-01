@@ -388,7 +388,7 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
     // Left side wall
     const leftWall = new THREE.Mesh(
         new THREE.PlaneGeometry(totalFloorDepth, ROOM_HEIGHT),
-        mat(C.wall)
+        mat(C.entryWall)
     );
     leftWall.rotation.y = Math.PI / 2;
     leftWall.position.set(-lobbyWidth / 2, ROOM_HEIGHT / 2, floorCenterZ);
@@ -397,7 +397,7 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
     // Right side wall
     const rightWall = new THREE.Mesh(
         new THREE.PlaneGeometry(totalFloorDepth, ROOM_HEIGHT),
-        mat(C.wall)
+        mat(C.entryWall)
     );
     rightWall.rotation.y = -Math.PI / 2;
     rightWall.position.set(lobbyWidth / 2, ROOM_HEIGHT / 2, floorCenterZ);
@@ -415,7 +415,7 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         const x1 = edges[i], x2 = edges[i + 1];
         const w = x2 - x1;
         if (w > 0.01) {
-            addPlane(scene, w, ROOM_HEIGHT, C.wall, (x1 + x2) / 2, ROOM_HEIGHT / 2, backZ, 0);
+            addPlane(scene, w, ROOM_HEIGHT, C.entryWall, (x1 + x2) / 2, ROOM_HEIGHT / 2, backZ, 0);
         }
     }
 
