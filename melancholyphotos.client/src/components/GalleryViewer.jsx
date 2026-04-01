@@ -32,6 +32,55 @@ function PhotoOverlay({ url, onClose }) {
     );
 }
 
+// ── Artist statement plaque overlay ──────────────────────────────────────────
+
+function PlaqueOverlay({ info, onClose }) {
+    return (
+        <div
+            className="absolute inset-0 z-20 flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.92)' }}
+        >
+            <button
+                onClick={onClose}
+                className="absolute top-3 right-4 text-white text-3xl font-bold leading-none hover:text-yellow-300 transition-colors"
+                style={{ textShadow: '0 0 8px #000' }}
+                aria-label="Close plaque"
+            >
+                ✕
+            </button>
+            <div
+                style={{
+                    maxWidth: 620, width: '90%',
+                    background: '#2c1e3d',
+                    border: '3px solid #d4af37',
+                    padding: '36px 40px',
+                    boxShadow: '0 0 40px rgba(212,165,32,0.25)',
+                }}
+            >
+                <div style={{ borderBottom: '1px solid #d4af37', paddingBottom: 16, marginBottom: 20 }}>
+                    <h2 style={{ color: '#f0d875', fontFamily: 'serif', fontSize: 32, margin: 0, textAlign: 'center' }}>
+                        {info.name}
+                    </h2>
+                </div>
+                {info.statement ? (
+                    <>
+                        <p style={{ color: '#b8963e', fontFamily: 'serif', fontSize: 13, textAlign: 'center', margin: '0 0 16px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                            Artist Statement
+                        </p>
+                        <p style={{ color: '#f0ebe0', fontFamily: 'serif', fontSize: 17, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
+                            {info.statement}
+                        </p>
+                    </>
+                ) : (
+                    <p style={{ color: '#b8963e', fontFamily: 'serif', fontSize: 15, textAlign: 'center', margin: 0, fontStyle: 'italic' }}>
+                        No artist statement provided.
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ── Crosshair ─────────────────────────────────────────────────────────────────
 
 function Crosshair() {
@@ -50,6 +99,7 @@ function Crosshair() {
 export default function GalleryViewer({ albums }) {
     const mountRef = useRef(null);
     const [selectedPhoto, setSelectedPhoto] = useState(null);
+    const [selectedPlaque, setSelectedPlaque] = useState(null);
     const [isLocked, setIsLocked] = useState(false);
     const [fading, setFading] = useState(false);
 
@@ -66,19 +116,33 @@ export default function GalleryViewer({ albums }) {
         controlsRef.current?.unlock();
     }, []);
 
+    const handlePlaqueClick = useCallback((info) => {
+        setSelectedPlaque(info);
+        controlsRef.current?.unlock();
+    }, []);
+
     const closePhoto = useCallback(() => {
         setSelectedPhoto(null);
-        // Short delay lets the overlay unmount before the browser accepts a lock request
         setTimeout(() => controlsRef.current?.lock(), 120);
     }, []);
 
-    // Escape key closes the full-size photo overlay
+    const closePlaque = useCallback(() => {
+        setSelectedPlaque(null);
+        setTimeout(() => controlsRef.current?.lock(), 120);
+    }, []);
+
+    // Escape key closes whichever overlay is open
     useEffect(() => {
-        if (!selectedPhoto) return;
-        const onKeyDown = (e) => { if (e.key === 'Escape') closePhoto(); };
+        if (!selectedPhoto && !selectedPlaque) return;
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                if (selectedPhoto) closePhoto();
+                else closePlaque();
+            }
+        };
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
-    }, [selectedPhoto, closePhoto]);
+    }, [selectedPhoto, selectedPlaque, closePhoto, closePlaque]);
 
     useEffect(() => {
         if (!albums || albums.length === 0) return;
@@ -153,8 +217,10 @@ export default function GalleryViewer({ albums }) {
             if (!controls.isLocked) return;
             raycaster.setFromCamera(center, camera);
             const hits = raycaster.intersectObjects(clickablesRef.current, false);
-            if (hits.length > 0 && hits[0].object.userData.isPhoto) {
-                handlePhotoClick(hits[0].object.userData.url);
+            if (hits.length > 0) {
+                const obj = hits[0].object;
+                if (obj.userData.isPhoto)  handlePhotoClick(obj.userData.url);
+                if (obj.userData.isPlaque) handlePlaqueClick(obj.userData.albumInfo);
             }
         };
         renderer.domElement.addEventListener('pointerdown', onPointerDown);
@@ -223,7 +289,7 @@ export default function GalleryViewer({ albums }) {
                 mount.removeChild(renderer.domElement);
             }
         };
-    }, [albums, handlePhotoClick]);
+    }, [albums, handlePhotoClick, handlePlaqueClick]);
 
     return (
         <div
@@ -234,10 +300,10 @@ export default function GalleryViewer({ albums }) {
             <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
             {/* Crosshair (while locked and no overlay) */}
-            {isLocked && !selectedPhoto && <Crosshair />}
+            {isLocked && !selectedPhoto && !selectedPlaque && <Crosshair />}
 
             {/* Enter prompt */}
-            {!isLocked && !selectedPhoto && (
+            {!isLocked && !selectedPhoto && !selectedPlaque && (
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end z-10 pb-6">
                     <div
                         className="px-5 py-2 text-sm font-semibold tracking-widest uppercase"
@@ -259,6 +325,11 @@ export default function GalleryViewer({ albums }) {
             {/* Full-size photo overlay */}
             {selectedPhoto && (
                 <PhotoOverlay url={selectedPhoto} onClose={closePhoto} />
+            )}
+
+            {/* Artist statement plaque overlay */}
+            {selectedPlaque && (
+                <PlaqueOverlay info={selectedPlaque} onClose={closePlaque} />
             )}
 
             {/* Fade-to-black overlay (exit door transition) */}

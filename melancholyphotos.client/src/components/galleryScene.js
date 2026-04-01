@@ -57,7 +57,57 @@ function createLabelTexture(text) {
     return new THREE.CanvasTexture(canvas);
 }
 
-// ── Plane helpers ─────────────────────────────────────────────────────────────
+// ── Plaque canvas texture (album name + artist statement hint) ────────────────
+
+function createPlaqueTexture(name) {
+    const W = 384, H = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    // Background
+    ctx.fillStyle = '#2c1e3d';
+    ctx.fillRect(0, 0, W, H);
+
+    // Outer gold border
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(4, 4, W - 8, H - 8);
+    // Inner gold border
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(12, 12, W - 24, H - 24);
+
+    // Decorative top rule
+    ctx.fillStyle = '#d4af37';
+    ctx.fillRect(24, 24, W - 48, 2);
+
+    // Album name (centered, wrapping if long)
+    ctx.fillStyle = '#f0d875';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const maxW = W - 48;
+    let fontSize = 44;
+    ctx.font = `bold ${fontSize}px serif`;
+    while (ctx.measureText(name).width > maxW && fontSize > 22) {
+        fontSize -= 2;
+        ctx.font = `bold ${fontSize}px serif`;
+    }
+    ctx.fillText(name, W / 2, 38);
+
+    // Decorative bottom rule
+    ctx.fillStyle = '#d4af37';
+    ctx.fillRect(24, H - 26, W - 48, 2);
+
+    // "Artist Statement" hint at bottom
+    ctx.fillStyle = '#b8963e';
+    ctx.font = 'italic 20px serif';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('· Artist Statement ·', W / 2, H - 30);
+
+    return canvas;
+}
+
+
 
 function addPlane(scene, w, h, color, px, py, pz, ry = 0) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat(color));
@@ -317,8 +367,40 @@ function buildAlbumRoom(scene, loader, clickables, album, cx, roomStartZ) {
     labelMesh.position.set(cx, ROOM_HEIGHT - 0.55, rz - ROOM_DEPTH + 0.05);
     scene.add(labelMesh);
 
+    // Clickable plaque on the lobby arch wall, to the right of this doorway
+    const PLAQUE_W = 0.9, PLAQUE_H = 0.70;
+    const plaqueTex = new THREE.CanvasTexture(createPlaqueTexture(album.name));
+    const plaqueMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(PLAQUE_W, PLAQUE_H),
+        new THREE.MeshLambertMaterial({ map: plaqueTex })
+    );
+    plaqueMesh.position.set(
+        cx + DOORWAY_WIDTH / 2 + 0.12 + PLAQUE_W / 2,
+        ROOM_HEIGHT / 2,
+        roomStartZ + 0.02
+    );
+    plaqueMesh.userData = {
+        isPlaque: true,
+        albumInfo: { name: album.name, statement: album.statement || '' },
+    };
+    clickables.push(plaqueMesh);
+    scene.add(plaqueMesh);
+
     // Inset can light in room ceiling
     addCanLight(scene, cx, rz - ROOM_DEPTH / 2, 0xfffae8, 6.0, 14);
+
+    // Braided ficus plants — flanking the arch doorway, centered between doorway edge and side wall
+    const ficusXOff = (DOORWAY_WIDTH / 2 + ROOM_WIDTH / 2) / 2; // 2.375
+    const ficusZ    = rz - 0.38;
+    addFicus(scene, cx - ficusXOff, ficusZ);
+    addFicus(scene, cx + ficusXOff, ficusZ);
+
+    // Obstacles for the two ficus plants (canopy radius ~0.52 + player buffer)
+    const PBUF = 0.40;
+    const ficusObstacles = [
+        { minX: cx - ficusXOff - PBUF, maxX: cx - ficusXOff + PBUF, minZ: ficusZ - PBUF, maxZ: ficusZ + PBUF },
+        { minX: cx + ficusXOff - PBUF, maxX: cx + ficusXOff + PBUF, minZ: ficusZ - PBUF, maxZ: ficusZ + PBUF },
+    ];
 
     // Photo frames
     const photosCopy = [...album.photos];
@@ -358,6 +440,79 @@ function buildAlbumRoom(scene, loader, clickables, album, cx, roomStartZ) {
         if (!photosCopy.length) break;
         const batch = photosCopy.splice(0, wallDef.max);
         batch.forEach((url, i) => wallDef.fn(url, i, batch.length));
+    }
+
+    return ficusObstacles;
+}
+
+// ── Braided benjamina ficus plant ─────────────────────────────────────────────
+
+function addFicus(scene, x, z) {
+    const potMat   = new THREE.MeshLambertMaterial({ color: 0x2e1f10 });
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a3820 });
+    const leafMat  = new THREE.MeshLambertMaterial({ color: 0x1c4a1c, side: THREE.DoubleSide });
+
+    // Tall ceramic pot
+    const POT_H = 0.50, POT_TR = 0.22, POT_BR = 0.14;
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(POT_TR, POT_BR, POT_H, 14), potMat);
+    pot.position.set(x, POT_H / 2, z);
+    scene.add(pot);
+
+    // Soil disk
+    const soil = new THREE.Mesh(new THREE.CylinderGeometry(POT_TR - 0.02, POT_TR - 0.02, 0.03, 14),
+        new THREE.MeshLambertMaterial({ color: 0x130a02 }));
+    soil.position.set(x, POT_H + 0.015, z);
+    scene.add(soil);
+
+    // Braided section: 3 strands spiraling around each other
+    const BRAID_H = 1.1, HELIX_R = 0.06, STRAND_R = 0.028, SEGMENTS = 14;
+    const up = new THREE.Vector3(0, 1, 0);
+    for (let t = 0; t < 3; t++) {
+        const phase = (t / 3) * Math.PI * 2;
+        for (let s = 0; s < SEGMENTS; s++) {
+            const t0 = s / SEGMENTS, t1 = (s + 1) / SEGMENTS;
+            const a0 = phase + t0 * Math.PI * 5; // 2.5 rotations
+            const a1 = phase + t1 * Math.PI * 5;
+            const p0 = new THREE.Vector3(x + Math.cos(a0) * HELIX_R, POT_H + t0 * BRAID_H, z + Math.sin(a0) * HELIX_R);
+            const p1 = new THREE.Vector3(x + Math.cos(a1) * HELIX_R, POT_H + t1 * BRAID_H, z + Math.sin(a1) * HELIX_R);
+            const dir = p1.clone().sub(p0).normalize();
+            const len = p0.distanceTo(p1);
+            const seg = new THREE.Mesh(new THREE.CylinderGeometry(STRAND_R, STRAND_R, len, 5), trunkMat);
+            seg.position.copy(p0.clone().add(p1).multiplyScalar(0.5));
+            seg.quaternion.setFromUnitVectors(up, dir);
+            scene.add(seg);
+        }
+    }
+
+    // Tapering single trunk above the braid
+    const UPPER_H = 0.35;
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.075, UPPER_H, 8), trunkMat);
+    upper.position.set(x, POT_H + BRAID_H + UPPER_H / 2, z);
+    scene.add(upper);
+
+    // Canopy — main sphere + accent spheres for irregular organic shape
+    const CANOPY_Y = POT_H + BRAID_H + UPPER_H + 0.42;
+    const mainR = 0.52;
+    const main = new THREE.Mesh(new THREE.SphereGeometry(mainR, 12, 9), leafMat);
+    main.scale.set(1, 0.88, 1);
+    main.position.set(x, CANOPY_Y, z);
+    scene.add(main);
+
+    // Drooping accent lobes (pendulous ficus character)
+    const lobes = [
+        [0.38,  0.05,  0.12,  0.34],
+        [-0.36, 0.08,  0.10,  0.32],
+        [0.10,  0.12,  0.38,  0.30],
+        [0.10,  0.12, -0.35,  0.30],
+        [0.28,  -0.18, 0.28,  0.30],
+        [-0.26, -0.20, -0.26, 0.28],
+        [0.0,   0.30,  0.0,   0.38],
+        [0.0,   -0.28, 0.0,   0.36],
+    ];
+    for (const [ox, oy, oz, r] of lobes) {
+        const lobe = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), leafMat);
+        lobe.position.set(x + ox, CANOPY_Y + oy, z + oz);
+        scene.add(lobe);
     }
 }
 
@@ -861,11 +1016,13 @@ export function buildScene(scene, albums) {
     const { waterfallUpdater, obstacles } = buildLobby(scene, n, lobbyWidth, roomXPositions, roomStartZ, exitDoors);
     buildFloorGrid(scene, lobbyWidth);
 
+    const roomObstacles = [];
     albums.forEach((album, i) => {
-        buildAlbumRoom(scene, loader, clickables, album, roomXPositions[i], roomStartZ);
+        const ficusObs = buildAlbumRoom(scene, loader, clickables, album, roomXPositions[i], roomStartZ);
+        roomObstacles.push(...ficusObs);
     });
 
-    return { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors, updateWaterfall: waterfallUpdater.update, obstacles };
+    return { clickables, lobbyWidth, roomXPositions, roomStartZ, exitDoors, updateWaterfall: waterfallUpdater.update, obstacles: [...obstacles, ...roomObstacles] };
 }
 
 // ── Collision zones ───────────────────────────────────────────────────────────

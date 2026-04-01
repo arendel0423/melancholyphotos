@@ -26,9 +26,20 @@ namespace MelancholyPhotos.Server.Controllers
                 {
                     var albumId = Path.GetFileName(albumDir);
                     var albumTxtPath = Path.Combine(albumDir, "album.txt");
-                    var albumName = System.IO.File.Exists(albumTxtPath)
-                        ? System.IO.File.ReadAllText(albumTxtPath).Trim()
-                        : albumId;
+                    string albumName, artistStatement;
+                    if (System.IO.File.Exists(albumTxtPath))
+                    {
+                        var lines = System.IO.File.ReadAllLines(albumTxtPath);
+                        albumName = lines.Length > 0 ? lines[0].Trim() : albumId;
+                        artistStatement = lines.Length > 1
+                            ? string.Join("\n", lines.Skip(1)).Trim()
+                            : "";
+                    }
+                    else
+                    {
+                        albumName = albumId;
+                        artistStatement = "";
+                    }
 
                     var extensions = new[] { "*.jpg", "*.jpeg", "*.png", "*.gif", "*.webp" };
                     var photos = extensions
@@ -37,7 +48,7 @@ namespace MelancholyPhotos.Server.Controllers
                         .Select(f => $"/gallery/{albumId}/{Uri.EscapeDataString(Path.GetFileName(f))}")
                         .ToList();
 
-                    return new { id = albumId, name = albumName, photos };
+                    return new { id = albumId, name = albumName, statement = artistStatement, photos };
                 })
                 .ToList();
 
