@@ -14,9 +14,9 @@ const MOVE_SPEED = 5.0;
 
 // Stylized color palette
 const C = {
-    floor:      0x2a2030,
-    wall:       0x4a3f5c,
-    ceiling:    0x1a1520,
+    floor:      0xc8c2b8,
+    wall:       0xf2ede5,
+    ceiling:    0xfafaf8,
     doorFrame:  0x8b6914,
     photoFrame: 0xd4af37,
     mat:        0xf0ebe0,
@@ -25,7 +25,7 @@ const C = {
 // ── Material helpers ──────────────────────────────────────────────────────────
 
 function mat(color, emissive = 0x000000, emissiveIntensity = 0) {
-    return new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity, side: THREE.FrontSide });
+    return new THREE.MeshLambertMaterial({ color, emissive, emissiveIntensity, side: THREE.DoubleSide });
 }
 
 // ── Text label texture ────────────────────────────────────────────────────────
@@ -63,6 +63,37 @@ function addPlane(scene, w, h, color, px, py, pz, ry = 0) {
     return mesh;
 }
 
+// ── Inset can light fixture ───────────────────────────────────────────────────
+
+function addCanLight(scene, x, z, lightColor, intensity, distance) {
+    const CAN_R = 0.14, CAN_H = 0.10;
+
+    // Cylindrical housing flush with ceiling
+    const can = new THREE.Mesh(
+        new THREE.CylinderGeometry(CAN_R, CAN_R, CAN_H, 16),
+        new THREE.MeshLambertMaterial({ color: 0x888888, side: THREE.DoubleSide })
+    );
+    can.position.set(x, ROOM_HEIGHT - CAN_H / 2, z);
+    scene.add(can);
+
+    // Emissive aperture disk (the bright opening facing down)
+    const disk = new THREE.Mesh(
+        new THREE.CircleGeometry(CAN_R * 0.72, 16),
+        new THREE.MeshLambertMaterial({
+            color: 0xffffff,
+            emissive: new THREE.Color(lightColor),
+            emissiveIntensity: 2.5,
+        })
+    );
+    disk.rotation.x = Math.PI / 2;
+    disk.position.set(x, ROOM_HEIGHT - CAN_H, z);
+    scene.add(disk);
+
+    const light = new THREE.PointLight(lightColor, intensity, distance);
+    light.position.set(x, ROOM_HEIGHT - CAN_H - 0.05, z);
+    scene.add(light);
+}
+
 // ── Photo frame ───────────────────────────────────────────────────────────────
 
 function addPhotoFrame(scene, loader, clickables, photoUrl, px, py, pz, ry) {
@@ -74,16 +105,14 @@ function addPhotoFrame(scene, loader, clickables, photoUrl, px, py, pz, ry) {
     group.rotation.y = ry;
 
     // Gold border
-    group.add(Object.assign(
-        new THREE.Mesh(new THREE.PlaneGeometry(FW, FH), mat(C.photoFrame)),
-        { position: new THREE.Vector3(0, 0, 0.001) }
-    ));
+    const borderMesh = new THREE.Mesh(new THREE.PlaneGeometry(FW, FH), mat(C.photoFrame));
+    borderMesh.position.set(0, 0, 0.001);
+    group.add(borderMesh);
 
     // Cream mat
-    group.add(Object.assign(
-        new THREE.Mesh(new THREE.PlaneGeometry(FW - BORDER * 2, FH - BORDER * 2), mat(C.mat)),
-        { position: new THREE.Vector3(0, 0, 0.002) }
-    ));
+    const matMesh = new THREE.Mesh(new THREE.PlaneGeometry(FW - BORDER * 2, FH - BORDER * 2), mat(C.mat));
+    matMesh.position.set(0, 0, 0.002);
+    group.add(matMesh);
 
     // Photo surface (grey placeholder, texture loaded async)
     const photoMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
@@ -167,10 +196,8 @@ function buildAlbumRoom(scene, loader, clickables, album, cx, roomStartZ) {
     labelMesh.position.set(cx, ROOM_HEIGHT - 0.55, rz - ROOM_DEPTH + 0.05);
     scene.add(labelMesh);
 
-    // Point light inside room
-    const light = new THREE.PointLight(0xffd4a0, 2.0, 14);
-    light.position.set(cx, ROOM_HEIGHT - 0.4, rz - ROOM_DEPTH / 2);
-    scene.add(light);
+    // Inset can light in room ceiling
+    addCanLight(scene, cx, rz - ROOM_DEPTH / 2, 0xfffae8, 6.0, 14);
 
     // Photo frames
     const photosCopy = [...album.photos];
@@ -280,17 +307,16 @@ function buildLobby(scene, numAlbums, lobbyWidth, roomXPositions, roomStartZ) {
         }
     }
 
-    // Ambient "chandelier" glow in lobby
-    const lobbyLight = new THREE.PointLight(0xc0b0ff, 1.2, 20);
-    lobbyLight.position.set(0, ROOM_HEIGHT - 0.3, -LOBBY_DEPTH / 2);
-    scene.add(lobbyLight);
+    // Inset can lights in lobby ceiling
+    addCanLight(scene, 0, -LOBBY_DEPTH * 0.25, 0xfffae8, 4.0, 18);
+    addCanLight(scene, 0, -LOBBY_DEPTH * 0.75, 0xfffae8, 4.0, 18);
 }
 
 // ── Floor tile accent lines (decorative) ─────────────────────────────────────
 
 function buildFloorGrid(scene, lobbyWidth) {
     const TILE = 2.0;
-    const gridMat = new THREE.MeshLambertMaterial({ color: 0x3a2f45 });
+    const gridMat = new THREE.MeshLambertMaterial({ color: 0xb0aba3 });
     const lineGeo = new THREE.PlaneGeometry(lobbyWidth + ROOM_SPACING * 2, 0.04);
     const lineGeoV = new THREE.PlaneGeometry(0.04, LOBBY_DEPTH + ROOM_DEPTH + ENTRANCE_DEPTH);
 
@@ -320,7 +346,7 @@ export function buildScene(scene, albums) {
     const roomStartZ = -LOBBY_DEPTH;
 
     // Lighting
-    const ambient = new THREE.AmbientLight(0x9090b0, 0.5);
+    const ambient = new THREE.AmbientLight(0xfff8f0, 1.0);
     scene.add(ambient);
 
     buildLobby(scene, n, lobbyWidth, roomXPositions, roomStartZ);
@@ -339,14 +365,20 @@ export function buildZones(lobbyWidth, roomXPositions, roomStartZ) {
     const PAD = 0.3;
     return [
         // Lobby + entrance
+        // Lobby + entrance
         {
             minX: -lobbyWidth / 2 + PAD, maxX: lobbyWidth / 2 - PAD,
-            minZ: roomStartZ + PAD,      maxZ: ENTRANCE_DEPTH - PAD,
+            minZ: roomStartZ,            maxZ: ENTRANCE_DEPTH - PAD,
         },
-        // Each album room
+        // Doorway connectors — narrow X, bridge the lobby/room z boundary
         ...roomXPositions.map(cx => ({
-            minX: cx - ROOM_WIDTH / 2 + PAD,  maxX: cx + ROOM_WIDTH / 2 - PAD,
-            minZ: roomStartZ - ROOM_DEPTH + PAD, maxZ: roomStartZ,
+            minX: cx - DOORWAY_WIDTH / 2 + PAD, maxX: cx + DOORWAY_WIDTH / 2 - PAD,
+            minZ: roomStartZ - PAD,              maxZ: roomStartZ,
+        })),
+        // Each album room interior
+        ...roomXPositions.map(cx => ({
+            minX: cx - ROOM_WIDTH / 2 + PAD,    maxX: cx + ROOM_WIDTH / 2 - PAD,
+            minZ: roomStartZ - ROOM_DEPTH + PAD, maxZ: roomStartZ - PAD,
         })),
     ];
 }

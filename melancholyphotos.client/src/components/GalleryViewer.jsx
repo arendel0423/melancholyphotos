@@ -61,6 +61,14 @@ export default function GalleryViewer({ albums }) {
         controlsRef.current?.unlock();
     }, []);
 
+    // Escape key closes the full-size photo overlay
+    useEffect(() => {
+        if (!selectedPhoto) return;
+        const onKeyDown = (e) => { if (e.key === 'Escape') setSelectedPhoto(null); };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [selectedPhoto]);
+
     useEffect(() => {
         if (!albums || albums.length === 0) return;
 
@@ -70,12 +78,14 @@ export default function GalleryViewer({ albums }) {
         const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(CANVAS_W, CANVAS_H);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
         mount.appendChild(renderer.domElement);
 
         // ── Scene & camera ────────────────────────────────────────────────────
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x080610);
-        scene.fog = new THREE.Fog(0x080610, 18, 38);
+        scene.background = new THREE.Color(0xf0ede5);
+        scene.fog = new THREE.Fog(0xf0ede5, 20, 45);
 
         const camera = new THREE.PerspectiveCamera(75, CANVAS_W / CANVAS_H, 0.1, 60);
         camera.position.set(0, PLAYER_HEIGHT, 3); // start in entrance area
@@ -89,7 +99,7 @@ export default function GalleryViewer({ albums }) {
         // ── Pointer lock controls ─────────────────────────────────────────────
         const controls = new PointerLockControls(camera, renderer.domElement);
         controlsRef.current = controls;
-        scene.add(controls.getObject());
+        scene.add(camera);
 
         const onLock   = () => setIsLocked(true);
         const onUnlock = () => setIsLocked(false);
@@ -142,8 +152,7 @@ export default function GalleryViewer({ albums }) {
             const delta = Math.min(clock.getDelta(), 0.05); // cap delta to avoid tunneling
 
             if (controls.isLocked) {
-                const obj = controls.getObject();
-                const prev = obj.position.clone();
+                const prev = camera.position.clone();
 
                 if (keys.w) controls.moveForward( MOVE_SPEED * delta);
                 if (keys.s) controls.moveForward(-MOVE_SPEED * delta);
@@ -151,12 +160,12 @@ export default function GalleryViewer({ albums }) {
                 if (keys.d) controls.moveRight(   MOVE_SPEED * delta);
 
                 // Collision: revert if outside all valid zones
-                if (!isInAnyZone(obj.position.x, obj.position.z, zones)) {
-                    obj.position.copy(prev);
+                if (!isInAnyZone(camera.position.x, camera.position.z, zones)) {
+                    camera.position.copy(prev);
                 }
 
                 // Lock Y to player eye height
-                obj.position.y = PLAYER_HEIGHT;
+                camera.position.y = PLAYER_HEIGHT;
             }
 
             renderer.render(scene, camera);

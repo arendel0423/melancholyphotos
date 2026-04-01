@@ -58,7 +58,7 @@ export default defineConfig({
                 target,
                 secure: false
             },
-            '^/gallery': {
+            '^/gallery/': {
                 target,
                 secure: false
             }
