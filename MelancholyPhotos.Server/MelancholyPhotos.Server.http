@@ -1,6 +1,0 @@
-@MelancholyPhotos.Server_HostAddress = http://localhost:5226
-
-GET {{MelancholyPhotos.Server_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
