@@ -391,7 +391,7 @@ function buildAlbumRoom(scene, loader, clickables, album, cx, roomStartZ) {
 
     // Braided ficus plants — flanking the arch doorway, centered between doorway edge and side wall
     const ficusXOff = (DOORWAY_WIDTH / 2 + ROOM_WIDTH / 2) / 2; // 2.375
-    const ficusZ    = rz - 0.38;
+    const ficusZ    = rz - 0.95; // pulled back so canopy clears the arch wall
     addFicus(scene, cx - ficusXOff, ficusZ);
     addFicus(scene, cx + ficusXOff, ficusZ);
 

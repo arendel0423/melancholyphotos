@@ -81,15 +81,50 @@ function PlaqueOverlay({ info, onClose }) {
     );
 }
 
-// ── Crosshair ─────────────────────────────────────────────────────────────────
+// ── Cursor overlay (crosshair or hand when hovering a clickable) ──────────────
 
-function Crosshair() {
+// Image is 128×128 — display at half (64×64). Hotspot (finger tip) ≈ (32, 4).
+const HAND_W = 64, HAND_H = 64, HAND_HOT_X = 32, HAND_HOT_Y = 4;
+
+function GalleryCursor({ cursorRef }) {
     return (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-10">
-            <div style={{ position: 'relative', width: 20, height: 20 }}>
-                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 2, background: 'rgba(255,255,255,0.8)', transform: 'translateY(-50%)' }} />
-                <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.8)', transform: 'translateX(-50%)' }} />
+        <div
+            ref={cursorRef}
+            className="pointer-events-none absolute inset-0 z-10"
+            data-hover="0"
+        >
+            {/* Crosshair — visible when data-hover="0" */}
+            <div
+                className="crosshair-lines"
+                style={{
+                    position: 'absolute', inset: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+            >
+                <div style={{ position: 'relative', width: 20, height: 20 }}>
+                    <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 2, background: 'rgba(255,255,255,0.8)', transform: 'translateY(-50%)' }} />
+                    <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.8)', transform: 'translateX(-50%)' }} />
+                </div>
             </div>
+            {/* Hand cursor — visible when data-hover="1", hotspot at center */}
+            <img
+                className="hand-cursor"
+                src="/src/assets/handcursor.png"
+                width={HAND_W}
+                height={HAND_H}
+                alt=""
+                style={{
+                    position: 'absolute',
+                    left: '50%', top: '50%',
+                    transform: `translate(-${HAND_HOT_X}px, -${HAND_HOT_Y}px)`,
+                    display: 'none',
+                    imageRendering: 'auto',
+                }}
+            />
+            <style>{`
+                [data-hover="1"] .crosshair-lines { display: none !important; }
+                [data-hover="1"] .hand-cursor { display: block !important; }
+            `}</style>
         </div>
     );
 }
@@ -110,6 +145,8 @@ export default function GalleryViewer({ albums }) {
     const fadingRef           = useRef(false);
     const updateWaterfallRef  = useRef(null);
     const obstaclesRef        = useRef([]);
+    const cursorRef           = useRef(null);
+    const isHoveringRef       = useRef(false);
 
     const handlePhotoClick = useCallback((url) => {
         setSelectedPhoto(url);
@@ -182,7 +219,12 @@ export default function GalleryViewer({ albums }) {
         scene.add(camera);
 
         const onLock   = () => setIsLocked(true);
-        const onUnlock = () => setIsLocked(false);
+        const onUnlock = () => {
+            setIsLocked(false);
+            // Reset hover cursor when pointer lock releases
+            isHoveringRef.current = false;
+            if (cursorRef.current) cursorRef.current.dataset.hover = '0';
+        };
         controls.addEventListener('lock',   onLock);
         controls.addEventListener('unlock', onUnlock);
 
@@ -265,6 +307,17 @@ export default function GalleryViewer({ albums }) {
                         break;
                     }
                 }
+
+                // Hover detection → swap crosshair / hand cursor
+                raycaster.setFromCamera(center, camera);
+                const hoverHits = raycaster.intersectObjects(clickablesRef.current, false);
+                const nowHovering = hoverHits.length > 0;
+                if (nowHovering !== isHoveringRef.current) {
+                    isHoveringRef.current = nowHovering;
+                    if (cursorRef.current) {
+                        cursorRef.current.dataset.hover = nowHovering ? '1' : '0';
+                    }
+                }
             }
 
             // Animate waterfall
@@ -299,8 +352,8 @@ export default function GalleryViewer({ albums }) {
             {/* Three.js canvas mount */}
             <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
 
-            {/* Crosshair (while locked and no overlay) */}
-            {isLocked && !selectedPhoto && !selectedPlaque && <Crosshair />}
+            {/* Cursor overlay: crosshair normally, hand when hovering a clickable */}
+            {isLocked && !selectedPhoto && !selectedPlaque && <GalleryCursor cursorRef={cursorRef} />}
 
             {/* Enter prompt */}
             {!isLocked && !selectedPhoto && !selectedPlaque && (
