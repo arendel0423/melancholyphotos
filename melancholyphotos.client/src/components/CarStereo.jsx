@@ -199,7 +199,7 @@ function drawDisplay(ctx, x, y, w, h, state) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function CarStereo() {
+export default function CarStereo({ playlistUrl = '/api/playlist' }) {
     const canvasRef   = useRef(null);
     const audioRef    = useRef(null);
     const audioCtxRef = useRef(null);
@@ -222,7 +222,7 @@ export default function CarStereo() {
 
     // ── Load tracks from API ──────────────────────────────────────────────────
     useEffect(() => {
-        fetch('/api/playlist')
+        fetch(playlistUrl)
             .then(r => r.ok ? r.json() : Promise.reject(r.status))
             .then(data => {
                 const loaded = Array.isArray(data) ? data : [];

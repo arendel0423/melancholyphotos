@@ -61,6 +61,10 @@ export default defineConfig({
             '^/gallery-playlist/': {
                 target,
                 secure: false
+            },
+            '^/about-playlist/': {
+                target,
+                secure: false
             }
         },
         port: parseInt(env.DEV_SERVER_PORT || '52210'),

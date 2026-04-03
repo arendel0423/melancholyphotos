@@ -163,3 +163,9 @@ body.homepage {
 body.homepage a {
   cursor: url("../assets/handcursor.png") 64 0, default;
 }
+body.aboutpage {
+  background: #030308;
+}
+body.aboutpage a {
+  cursor: url("../assets/handcursor.png") 64 0, default;
+}
