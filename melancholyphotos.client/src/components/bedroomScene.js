@@ -31,12 +31,14 @@ function neonMat(color) {
     return new THREE.MeshLambertMaterial({
         color: new THREE.Color(color),
         emissive: new THREE.Color(color),
-        emissiveIntensity: 3.0,
+        emissiveIntensity: 1.1,
     });
 }
 
 // Emissive thin box used as a neon light strip.
 // lengthX/Y/Z: pass the desired length along each axis; unused axes are set to 0.04 (tube thickness).
+// Places PointLights every LIGHT_SPACING metres along the strip's primary axis so the whole length glows.
+const NEON_LIGHT_SPACING = 1.5;
 function addNeonStrip(scene, x, y, z, lengthX, lengthY, lengthZ, color, lightIntensity = 1.2, lightDist = 5) {
     const lx = Math.max(lengthX, 0.04);
     const ly = Math.max(lengthY, 0.04);
@@ -45,9 +47,20 @@ function addNeonStrip(scene, x, y, z, lengthX, lengthY, lengthZ, color, lightInt
     strip.position.set(x, y, z);
     scene.add(strip);
 
-    const light = new THREE.PointLight(color, lightIntensity, lightDist);
-    light.position.set(x, y, z);
-    scene.add(light);
+    // Determine the primary (longest) axis and distribute lights along it.
+    const primaryLen = Math.max(lx, ly, lz);
+    const count = Math.max(1, Math.ceil(primaryLen / NEON_LIGHT_SPACING));
+    const perLight = lightIntensity / count;   // keep total energy constant
+
+    for (let i = 0; i < count; i++) {
+        const t = count === 1 ? 0 : (i / (count - 1)) - 0.5;  // -0.5 … +0.5
+        const lx2 = lx === primaryLen ? x + t * lx : x;
+        const ly2 = ly === primaryLen ? y + t * ly : y;
+        const lz2 = lz === primaryLen ? z + t * lz : z;
+        const pl = new THREE.PointLight(color, perLight, lightDist);
+        pl.position.set(lx2, ly2, lz2);
+        scene.add(pl);
+    }
 }
 
 // ── Procedural textures ────────────────────────────────────────────────────────
@@ -529,16 +542,20 @@ export function buildBedroomScene(scene) {
     // ── Ceiling neon strips ────────────────────────────────────────────────────
     const STRIP_Y = ROOM_H - 0.05;
     const INSET = 0.15;
-    // Front & back (run along X)
-    addNeonStrip(scene, 0, STRIP_Y,  HD - INSET, ROOM_W - 0.3, 0.04, 0.04, C.neonCyan, 1.0, 7);
-    addNeonStrip(scene, 0, STRIP_Y, -HD + INSET, ROOM_W - 0.3, 0.04, 0.04, C.neonMag,  1.0, 7);
-    // Left & right (run along Z)
-    addNeonStrip(scene, -HW + INSET, STRIP_Y, 0, 0.04, 0.04, ROOM_D - 0.3, C.neonMag,  0.9, 7);
-    addNeonStrip(scene,  HW - INSET, STRIP_Y, 0, 0.04, 0.04, ROOM_D - 0.3, C.neonCyan, 0.9, 7);
+    const NEON_CEIL  = 0xfcef03;  // yellow — ceiling trim
+    const NEON_FLOOR = 0x49bcdb;  // sky-blue — floor trim
 
-    // Floor accent strips along front and back walls
-    addNeonStrip(scene, 0, 0.02,  HD - INSET, ROOM_W - 0.3, 0.04, 0.04, C.neonPurp, 0.45, 3);
-    addNeonStrip(scene, 0, 0.02, -HD + INSET, ROOM_W - 0.3, 0.04, 0.04, C.neonPurp, 0.45, 3);
+    // Ceiling neon strips — all four walls, uniform yellow
+    addNeonStrip(scene, 0,          STRIP_Y,  HD - INSET, ROOM_W - 0.3, 0.04, 0.04, NEON_CEIL, 1.0, 7);
+    addNeonStrip(scene, 0,          STRIP_Y, -HD + INSET, ROOM_W - 0.3, 0.04, 0.04, NEON_CEIL, 1.0, 7);
+    addNeonStrip(scene, -HW + INSET, STRIP_Y, 0, 0.04, 0.04, ROOM_D - 0.3, NEON_CEIL, 0.9, 7);
+    addNeonStrip(scene,  HW - INSET, STRIP_Y, 0, 0.04, 0.04, ROOM_D - 0.3, NEON_CEIL, 0.9, 7);
+
+    // Floor accent strips — all four walls, uniform sky-blue
+    addNeonStrip(scene, 0, 0.02,  HD - INSET, ROOM_W - 0.3, 0.04, 0.04, NEON_FLOOR, 0.6, 4);
+    addNeonStrip(scene, 0, 0.02, -HD + INSET, ROOM_W - 0.3, 0.04, 0.04, NEON_FLOOR, 0.6, 4);
+    addNeonStrip(scene, -HW + INSET, 0.02, 0, 0.04, 0.04, ROOM_D - 0.3, NEON_FLOOR, 0.6, 4);
+    addNeonStrip(scene,  HW - INSET, 0.02, 0, 0.04, 0.04, ROOM_D - 0.3, NEON_FLOOR, 0.6, 4);
 
     // ── Bed (against left wall, center-left of room) ───────────────────────────
     const BED_W = 2.0, BED_L = 3.8, BED_PLAT_H = 0.32;
@@ -576,53 +593,84 @@ export function buildBedroomScene(scene) {
     blanket.position.set(BED_X, BED_PLAT_H + 0.22, BED_Z + 0.4);
     scene.add(blanket);
 
-    // ── Desk (back-right, against back wall) ───────────────────────────────────
-    const DESK_W = 3.4, DESK_D = 0.9, DESK_H = 0.78;
-    const DESK_X = HW / 2 + 0.7;
-    const DESK_Z = -HD + DESK_D / 2 + 0.08;
+    // ── L-Desk (back wall section + right wall arm) ────────────────────────────
+    const DESK_D = 0.9, DESK_H = 0.78;
 
-    // Desk top
-    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(DESK_W, 0.055, DESK_D), mat(C.deskBody));
-    deskTop.position.set(DESK_X, DESK_H, DESK_Z);
-    scene.add(deskTop);
+    // Back section: runs the full width of the right half along the back wall
+    const BACK_W    = 4.1;
+    const BACK_DESK_X = HW - BACK_W / 2;     // = 4.5 - 2.05 = 2.45  (right side of room)
+    const DESK_Z    = -HD + DESK_D / 2 + 0.05;
 
-    // Legs
+    const deskBack = new THREE.Mesh(new THREE.BoxGeometry(BACK_W, 0.055, DESK_D), mat(C.deskBody));
+    deskBack.position.set(BACK_DESK_X, DESK_H, DESK_Z);
+    scene.add(deskBack);
+
+    // Right-wall arm: runs along the right wall from the back corner forward
+    const SIDE_L    = 2.8;
+    const SIDE_X    = HW - DESK_D / 2;       // = 4.05
+    const SIDE_Z    = -HD + DESK_D / 2 + SIDE_L / 2;  // center of arm length
+
+    const deskArm = new THREE.Mesh(new THREE.BoxGeometry(DESK_D, 0.055, SIDE_L), mat(C.deskBody));
+    deskArm.position.set(SIDE_X, DESK_H, SIDE_Z);
+    scene.add(deskArm);
+
+    // Legs — back section
     [
-        [DESK_X - DESK_W / 2 + 0.1, DESK_Z - DESK_D / 2 + 0.09],
-        [DESK_X + DESK_W / 2 - 0.1, DESK_Z - DESK_D / 2 + 0.09],
-        [DESK_X - DESK_W / 2 + 0.1, DESK_Z + DESK_D / 2 - 0.09],
-        [DESK_X + DESK_W / 2 - 0.1, DESK_Z + DESK_D / 2 - 0.09],
+        [BACK_DESK_X - BACK_W / 2 + 0.1, DESK_Z - DESK_D / 2 + 0.09],
+        [BACK_DESK_X - BACK_W / 2 + 0.1, DESK_Z + DESK_D / 2 - 0.09],
     ].forEach(([lx, lz]) => {
         const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, DESK_H - 0.03, 0.06), mat(0x0f0f1e));
         leg.position.set(lx, (DESK_H - 0.03) / 2, lz);
         scene.add(leg);
     });
 
-    // Desk front neon strip
-    addNeonStrip(scene, DESK_X, DESK_H + 0.04, DESK_Z + DESK_D / 2, DESK_W, 0.04, 0.04, C.neonMag, 0.7, 3);
+    // Leg — far end of right arm
+    const armLeg = new THREE.Mesh(new THREE.BoxGeometry(0.06, DESK_H - 0.03, 0.06), mat(0x0f0f1e));
+    armLeg.position.set(SIDE_X, (DESK_H - 0.03) / 2, SIDE_Z + SIDE_L / 2 - 0.09);
+    scene.add(armLeg);
 
-    // ── Monitors ───────────────────────────────────────────────────────────────
+    // Neon accent strips on desk edges
+    addNeonStrip(scene, BACK_DESK_X, DESK_H + 0.03, DESK_Z + DESK_D / 2, BACK_W, 0.04, 0.04, C.neonMag, 0.7, 3);
+    addNeonStrip(scene, SIDE_X - DESK_D / 2, DESK_H + 0.03, SIDE_Z, 0.04, 0.04, SIDE_L, C.neonMag, 0.6, 3);
+
+    // ── Back wall monitors (2, on back section) ────────────────────────────────
     const MON_THICK = 0.055;
     const BACK_WALL_Z = -HD + MON_THICK / 2 + 0.09;
 
-    // Main monitor (center-left on desk)
     const mon1Tex = createMonitorTexture(0);
-    const mon1W = 1.1, mon1H = 0.7;
-    addMonitor(scene, DESK_X - 0.75, DESK_H + mon1H / 2 + 0.05, BACK_WALL_Z, mon1W, mon1H, MON_THICK, mon1Tex, 0x0033aa);
+    addMonitor(scene, BACK_DESK_X - 0.9, DESK_H + 0.7 / 2 + 0.05, BACK_WALL_Z, 1.1, 0.7, MON_THICK, mon1Tex, 0x0033aa);
 
-    // Second monitor (right, slightly angled)
     const mon2Tex = createMonitorTexture(1);
-    const mon2W = 0.95, mon2H = 0.62;
-    addMonitor(scene, DESK_X + 0.75, DESK_H + mon2H / 2 + 0.05, BACK_WALL_Z, mon2W, mon2H, MON_THICK, mon2Tex, 0xaa0055, -0.22);
+    addMonitor(scene, BACK_DESK_X + 0.55, DESK_H + 0.62 / 2 + 0.05, BACK_WALL_Z, 0.95, 0.62, MON_THICK, mon2Tex, 0xaa0055, -0.18);
 
-    // Keyboard
+    // Keyboard on back section
     const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.025, 0.3), mat(0x0c0c18));
-    keyboard.position.set(DESK_X - 0.35, DESK_H + 0.025, DESK_Z + 0.2);
+    keyboard.position.set(BACK_DESK_X - 0.5, DESK_H + 0.025, DESK_Z + 0.2);
     scene.add(keyboard);
-    addNeonStrip(scene, DESK_X - 0.35, DESK_H + 0.008, DESK_Z + 0.2, 0.86, 0.04, 0.04, C.neonCyan, 0.4, 2);
+    addNeonStrip(scene, BACK_DESK_X - 0.5, DESK_H + 0.008, DESK_Z + 0.2, 0.86, 0.04, 0.04, C.neonCyan, 0.4, 2);
+
+    // ── Right-wall monitors (2×2 grid on arm, facing into room) ───────────────
+    const MON_S_W = 0.82, MON_S_H = 0.54;
+    const RIGHT_WALL_X = HW - MON_THICK / 2 - 0.01;
+    const ARM_CENTER_Z = SIDE_Z;                          // z center of the arm
+    const MON_GAP_Z = MON_S_W / 2 + 0.04;                // half-spacing between monitors in a row
+    const MON_GAP_Y = MON_S_H + 0.055;                   // row spacing
+    const MON_BOT_Y  = DESK_H + MON_S_H / 2 + 0.06;
+    const monTexes = [
+        createMonitorTexture(0), createMonitorTexture(1),
+        createMonitorTexture(0), createMonitorTexture(1),
+    ];
+    const monColors = [0x0055cc, 0x880044, 0x004488, 0x660033];
+    [[ARM_CENTER_Z - MON_GAP_Z, MON_BOT_Y],
+     [ARM_CENTER_Z + MON_GAP_Z, MON_BOT_Y],
+     [ARM_CENTER_Z - MON_GAP_Z, MON_BOT_Y + MON_GAP_Y],
+     [ARM_CENTER_Z + MON_GAP_Z, MON_BOT_Y + MON_GAP_Y],
+    ].forEach(([mz, my], i) => {
+        addMonitor(scene, RIGHT_WALL_X, my, mz, MON_S_W, MON_S_H, MON_THICK, monTexes[i], monColors[i], -Math.PI / 2);
+    });
 
     // ── Chair ──────────────────────────────────────────────────────────────────
-    const CHAIR_X = DESK_X - 0.4, CHAIR_Z = DESK_Z + 1.15;
+    const CHAIR_X = BACK_DESK_X - 0.4, CHAIR_Z = DESK_Z + 1.15;
 
     const seat = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.07, 0.52), mat(0x12101e));
     seat.position.set(CHAIR_X, 0.50, CHAIR_Z);
@@ -714,7 +762,6 @@ export function buildBedroomScene(scene) {
     // ── Posters ────────────────────────────────────────────────────────────────
     addPoster(scene, HW - 0.02, 1.75, 3.2, -Math.PI / 2, createPosterTexture(0));   // right wall, near entrance
     addPoster(scene, -HW + 0.02, 1.75, -1.5, Math.PI / 2, createPosterTexture(1));  // left wall, above bed
-    addPoster(scene, 2.6, 1.75, -HD + 0.02, 0, createPosterTexture(2));             // back wall, right of window
 
     // ── Holographic panel above desk ───────────────────────────────────────────
     const HOLO_Y_BASE = DESK_H + 1.5;
@@ -729,12 +776,12 @@ export function buildBedroomScene(scene) {
             side: THREE.DoubleSide,
         })
     );
-    holo.position.set(DESK_X - 0.2, HOLO_Y_BASE, DESK_Z - 0.2);
+    holo.position.set(BACK_DESK_X - 0.2, HOLO_Y_BASE, DESK_Z - 0.2);
     holo.rotation.x = -0.14;
     scene.add(holo);
 
     const holoLight = new THREE.PointLight(0x00ffff, 1.1, 4);
-    holoLight.position.set(DESK_X - 0.2, HOLO_Y_BASE, DESK_Z - 0.2 + 0.5);
+    holoLight.position.set(BACK_DESK_X - 0.2, HOLO_Y_BASE, DESK_Z - 0.2 + 0.5);
     scene.add(holoLight);
 
     // ── Obstacles ──────────────────────────────────────────────────────────────
@@ -742,8 +789,10 @@ export function buildBedroomScene(scene) {
     const obstacles = [
         // Bed
         { minX: BED_X - BED_W / 2 - P, maxX: BED_X + BED_W / 2 + P, minZ: BED_Z - BED_L / 2 - P, maxZ: BED_Z + BED_L / 2 + P },
-        // Desk
-        { minX: DESK_X - DESK_W / 2 - P, maxX: DESK_X + DESK_W / 2 + P, minZ: DESK_Z - DESK_D / 2 - P, maxZ: DESK_Z + DESK_D / 2 + P },
+        // Desk back section
+        { minX: BACK_DESK_X - BACK_W / 2 - P, maxX: HW - 0.1, minZ: DESK_Z - DESK_D / 2 - P, maxZ: DESK_Z + DESK_D / 2 + P },
+        // Desk right arm
+        { minX: SIDE_X - DESK_D / 2 - P, maxX: HW - 0.1, minZ: -HD + 0.2, maxZ: SIDE_Z + SIDE_L / 2 + P },
         // Chair
         { minX: CHAIR_X - 0.42, maxX: CHAIR_X + 0.42, minZ: CHAIR_Z - 0.45, maxZ: CHAIR_Z + 0.45 },
         // Bookshelf
